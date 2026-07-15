@@ -5,7 +5,7 @@ const Logic = require("./gameLogic");
 exports.main = function main(param) {
   const scene = new g.Scene({ game: g.game, assetIds: ["sprites", "field"] });
   const random = param.random || g.game.random;
-  g.game.vars.gameState = { score: 0 };
+  g.game.vars.gameState = { score: 0, difficulty: "normal" };
 
   scene.onLoad.add(() => {
     const W = g.game.width;
@@ -47,6 +47,13 @@ exports.main = function main(param) {
         "レイス": { col: 5, row: 1 }
       };
       if (specials[spec.name]) return specials[spec.name];
+      if (spec.tier > 0) {
+        const upgradedCells = {
+          bone: { col: 1, row: 1 }, fang: { col: 3, row: 1 }, iron: { col: 4, row: 1 },
+          mana: { col: 2, row: 1 }, soul: { col: 5, row: 1 }
+        };
+        if (upgradedCells[spec.primary]) return upgradedCells[spec.primary];
+      }
       const cells = {
         bone: { col: 1, row: 0 }, fang: { col: 2, row: 0 }, iron: { col: 3, row: 0 },
         mana: { col: 4, row: 0 }, mushroom: { col: 5, row: 0 }, soul: { col: 0, row: 1 }
@@ -137,7 +144,7 @@ exports.main = function main(param) {
     root.append(statusLabel);
     const comboLabel = new g.Label({ scene, x: W - 260, y: 35, anchorX: 1, font: font20, text: "", textColor: "#ffd064" });
     root.append(comboLabel);
-    const kingHpLabel = new g.Label({ scene, x: W - 18, y: 34, anchorX: 1, font: font16, text: "魔王HP 100/100", textColor: "#ffb2c9" });
+    const kingHpLabel = new g.Label({ scene, x: W - 18, y: 34, anchorX: 1, font: font16, text: "魔王HP 50/50", textColor: "#ffb2c9" });
     root.append(kingHpLabel);
     const kingHpBg = new g.FilledRect({ scene, x: W - 370, y: 15, width: 190, height: 12, cssColor: "#3d2630" });
     const kingHpBar = new g.FilledRect({ scene, x: W - 370, y: 15, width: 190, height: 12, cssColor: "#e95780" });
@@ -149,7 +156,8 @@ exports.main = function main(param) {
 
     let elapsed = 0;
     let phase = "ready";
-    let readyLeft = 5;
+    let difficultyId = "normal";
+    let difficulty = Logic.difficultySettings(difficultyId);
     let spawnLeft = 6;
     let dropLeft = 0.5;
     let score = 0;
@@ -179,8 +187,8 @@ exports.main = function main(param) {
       x: W / 2,
       y: 450,
       alive: true,
-      hp: 100,
-      maxHp: 100,
+      hp: 50,
+      maxHp: 50,
       reviveLeft: 0,
       invincible: 0,
       sinceDamage: 99,
@@ -243,8 +251,9 @@ exports.main = function main(param) {
       const glyph = atlasSprite(cell.col, cell.row, x + 10, y + 4, 48, 48, false);
       const name = new g.Label({ scene, x: x + 58, y: y + 9, anchorX: 0.5, font: font16, text: cat.name, textColor: "#ffffff" });
       const count = new g.Label({ scene, x: x + 58, y: y + 43, anchorX: 0.5, font: font20, text: "×1", textColor: "#ffffff" });
-      root.append(base); root.append(strip); root.append(glyph); root.append(name); root.append(count);
-      const button = { cat, base, strip, glyph, name, count, x, y };
+      const lock = new g.Label({ scene, x: x + 105, y: y + 64, anchorX: 1, font: font12, text: "", textColor: "#ff9b9b" });
+      root.append(base); root.append(strip); root.append(glyph); root.append(name); root.append(count); root.append(lock);
+      const button = { cat, base, strip, glyph, name, count, lock, x, y };
       buttons.push(button);
 
       base.onPointDown.add(() => {
@@ -338,8 +347,14 @@ exports.main = function main(param) {
     function setScore(value) {
       score = Math.max(0, Math.floor(value));
       g.game.vars.gameState.score = score;
-      scoreLabel.text = "SCORE " + score;
+      scoreLabel.text = "SCORE " + score + (difficulty.scoreMultiplier > 1 ? "  HARD×2" : "");
       scoreLabel.invalidate();
+    }
+
+    function awardScore(basePoints) {
+      const awarded = Logic.scoreAward(basePoints, difficultyId);
+      setScore(score + awarded);
+      return awarded;
     }
 
     function showToast(text, color) {
@@ -356,9 +371,11 @@ exports.main = function main(param) {
         const used = selected.filter((id) => id === b.cat.id).length;
         const canAdd = canAddCatalyst(b.cat.id);
         const costLocked = selected.length + 1 > remainingCost();
-        b.count.text = costLocked && !used ? "上限" : "×" + inventory[b.cat.id] + (used ? "  選" + used : "");
+        b.count.text = "×" + inventory[b.cat.id] + (used ? "  選" + used : "");
+        b.lock.text = costLocked && !used ? "上限" : "";
         b.count.textColor = used ? "#fff0a5" : canAdd ? "#ffffff" : "#78847f";
         b.count.invalidate();
+        b.lock.invalidate();
         b.base.cssColor = used ? "#435147" : canAdd ? "#24312e" : "#151a18";
         const opacity = used || canAdd ? 1 : 0.34;
         b.strip.opacity = opacity;
@@ -514,6 +531,10 @@ exports.main = function main(param) {
         minion.hp = Math.round(minion.hp * ratio);
         minion.attack = Math.round(minion.attack * ratio);
         minion.tier = nextTier;
+        const cell = minionCell(minion);
+        minion.body.srcX = cell.col * ATLAS_CELL;
+        minion.body.srcY = cell.row * ATLAS_CELL;
+        minion.body.modified();
         burst(minion.x, minion.y, "#a8ffcf", 5);
       });
       if (minions.length) showToast("魔王軍強化！ 全モンスター ×" + nextBoost.toFixed(2), "#a8ffcf");
@@ -523,7 +544,7 @@ exports.main = function main(param) {
       if (drops.length >= 20) return;
       const cat = forcedId ? Logic.CATALYSTS.find((c) => c.id === forcedId) : Logic.CATALYSTS[Math.floor(random.generate() * Logic.CATALYSTS.length)];
       const cell = catalystCell(cat.id);
-      const body = atlasSprite(cell.col, cell.row, x - 15, y - 15, 30, 30, false);
+      const body = atlasSprite(cell.col, cell.row, x - 20, y - 20, 40, 40, false);
       const label = new g.Label({ scene, x, y: y - 8, anchorX: 0.5, font: font12, text: "", textColor: "#18201e" });
       unitLayer.append(body); unitLayer.append(label);
       drops.push({ x, y, id: cat.id, body, label, age: 0 });
@@ -560,7 +581,7 @@ exports.main = function main(param) {
       const base = ENEMY_TYPES[typeId];
       const gate = gates[Math.floor(random.generate() * gates.length)];
       const mult = typeId === "hero" ? 1 : Logic.enemyMultiplier(elapsed);
-      const hp = Math.round(base.hp * mult);
+      const hp = Math.round(base.hp * mult * difficulty.enemyHp);
       const x = gate.sx;
       const y = gate.sy;
       const cell = enemyCell(typeId);
@@ -571,7 +592,11 @@ exports.main = function main(param) {
       const label = new g.Label({ scene, x, y: y - 9, anchorX: 0.5, font: font12, text: "", textColor: "#1b201e" });
       unitLayer.append(body); unitLayer.append(hpBg); unitLayer.append(hpBar); unitLayer.append(label);
       enemies.push({
-        ...base, typeId, x, y, hp, maxHp: hp, attack: base.attack * mult, body, hpBg, hpBar, label,
+        ...base, typeId, x, y, hp, maxHp: hp,
+        attack: base.attack * mult * difficulty.enemyAttack,
+        speed: base.speed * difficulty.enemySpeed,
+        cooldown: base.cooldown * difficulty.enemyCooldown,
+        body, hpBg, hpBar, label,
         attackLeft: random.generate() * 0.5, poisonLeft: 0, poisonTick: 0, scatterTarget: null
       });
       if (!king.alive) assignScatterTarget(enemies[enemies.length - 1]);
@@ -655,8 +680,8 @@ exports.main = function main(param) {
       }
       king.invincible = Math.max(0, king.invincible - dt);
       king.sinceDamage += dt;
-      if (king.sinceDamage >= 5 && king.hp < king.maxHp) {
-        king.hp = Math.min(king.maxHp, king.hp + 4 * dt);
+      if (difficulty.kingRegen > 0 && king.sinceDamage >= 5 && king.hp < king.maxHp) {
+        king.hp = Math.min(king.maxHp, king.hp + difficulty.kingRegen * dt);
         refreshKingHp();
       }
       moveToward(king, { x: king.targetX, y: king.targetY }, 155, dt, 1);
@@ -775,13 +800,13 @@ exports.main = function main(param) {
           combo = comboLeft > 0 ? combo + 1 : 1;
           comboLeft = 3;
           const risk = king.alive && Logic.distance(e, king) < 120;
-          let gained = Logic.scoreForKill(e.score, elapsed, combo, risk);
+          let baseGained = Logic.scoreForKill(e.score, elapsed, combo, risk);
           if (e.typeId === "hero") {
             bossDefeated = true;
-            gained += Math.floor(Math.max(0, GAME_TIME - elapsed) * 150);
-            showToast("勇者撃破！ ＋" + gained, "#ffe470");
+            baseGained += Math.floor(Math.max(0, GAME_TIME - elapsed) * 150);
           }
-          setScore(score + gained);
+          const gained = awardScore(baseGained);
+          if (e.typeId === "hero") showToast("勇者撃破！ ＋" + gained, "#ffe470");
           if (random.generate() < 0.38 || e.typeId === "hero") spawnDrop(e.x, e.y);
           burst(e.x, e.y, e.color, e.typeId === "hero" ? 18 : 6);
           destroyUnit(e);
@@ -951,37 +976,71 @@ exports.main = function main(param) {
       if (ended) return;
       ended = true;
       phase = "end";
-      if (deaths === 0) setScore(score + 4000);
+      const noDeathBonus = deaths === 0 ? awardScore(4000) : 0;
       const overlay = new g.FilledRect({ scene, width: W, height: H, cssColor: "#07100e", opacity: 0.9 });
       root.append(overlay);
       root.append(new g.Label({ scene, x: W / 2, y: 150, anchorX: 0.5, font: font42, text: "防衛戦終了", textColor: "#f3d78b" }));
       root.append(new g.Label({ scene, x: W / 2, y: 230, anchorX: 0.5, font: font42, text: "SCORE  " + score, textColor: "#ffffff" }));
-      root.append(new g.Label({ scene, x: W / 2, y: 310, anchorX: 0.5, font: font20, text: "勇者 " + (bossDefeated ? "撃破" : "生存") + "　魔王死亡 " + deaths + "回　最大軍勢 " + FINAL_COST_LIMIT, textColor: "#c9d9d1" }));
-      if (deaths === 0) root.append(new g.Label({ scene, x: W / 2, y: 355, anchorX: 0.5, font: font28, text: "ノーデスボーナス +4000", textColor: "#8ee6c3" }));
+      root.append(new g.Label({ scene, x: W / 2, y: 310, anchorX: 0.5, font: font20, text: difficulty.name + "　勇者 " + (bossDefeated ? "撃破" : "生存") + "　魔王死亡 " + deaths + "回　最大軍勢 " + FINAL_COST_LIMIT, textColor: "#c9d9d1" }));
+      if (deaths === 0) root.append(new g.Label({ scene, x: W / 2, y: 355, anchorX: 0.5, font: font28, text: "ノーデスボーナス +" + noDeathBonus, textColor: "#8ee6c3" }));
       root.append(new g.Label({ scene, x: W / 2, y: 430, anchorX: 0.5, font: font16, text: "ランキングへスコアを送信中…", textColor: "#aebdb8" }));
       if (g.game.requestSaveScore) g.game.requestSaveScore(score);
     }
 
     function showReadyOverlay() {
       const overlay = new g.FilledRect({ scene, width: W, height: H, cssColor: "#07100e", opacity: 0.88 });
-      const panel = new g.FilledRect({ scene, x: 190, y: 95, width: 900, height: 500, cssColor: "#172923" });
-      const readyTitle = new g.Label({ scene, x: W / 2, y: 120, anchorX: 0.5, font: font42, text: "最弱魔王の180秒防衛戦", textColor: "#f3d78b" });
+      const panel = new g.FilledRect({ scene, x: 170, y: 70, width: 940, height: 570, cssColor: "#172923" });
+      const readyTitle = new g.Label({ scene, x: W / 2, y: 94, anchorX: 0.5, font: font42, text: "最弱魔王の180秒防衛戦", textColor: "#f3d78b" });
       const lines = [
-        "魔王は100HP制。被弾エフェクトを見てドラッグで回避しよう",
-        "触媒を1～3個選ぶと戦術停止。戦場をタップして召喚",
-        "軍勢上限は45秒ごとに 6 → 9 → 12 → 15 へ拡張",
-        "魔王と収集型モンスターで、戦場の触媒を回収",
-        "160秒で勇者襲来。撃破速度・コンボ・ノーデスで高得点"
+        "魔王をドラッグして移動し、触媒アイテムを集める",
+        "画面下の触媒を1～3個タップして選ぶ",
+        "光った戦場をタップしてモンスターを召喚する"
       ];
-      root.append(overlay); root.append(panel); root.append(readyTitle);
-      const lineLabels = lines.map((line, i) => new g.Label({ scene, x: 245, y: 205 + i * 48, font: font20, text: "・" + line, textColor: "#e7efec" }));
-      lineLabels.forEach((lineLabel) => root.append(lineLabel));
-      const count = new g.Label({ scene, x: W / 2, y: 500, anchorX: 0.5, font: font42, text: "開始まで 5", textColor: "#8ee6c3" });
-      root.append(count);
-      return { overlay, panel, readyTitle, count, lineLabels };
+      const entities = [overlay, panel, readyTitle];
+      entities.forEach((entity) => root.append(entity));
+      const operationTitle = new g.Label({ scene, x: 230, y: 165, font: font20, text: "操作方法", textColor: "#8ee6c3" });
+      const lineLabels = lines.map((line, i) => new g.Label({ scene, x: 245, y: 205 + i * 40, font: font20, text: (i + 1) + ". " + line, textColor: "#e7efec" }));
+      const difficultyTitle = new g.Label({ scene, x: 230, y: 340, font: font20, text: "難易度を選択（デフォルト：ノーマル）", textColor: "#8ee6c3" });
+      const normalButton = new g.FilledRect({ scene, x: 245, y: 380, width: 370, height: 78, cssColor: "#315b4b", touchable: true });
+      const hardButton = new g.FilledRect({ scene, x: 665, y: 380, width: 370, height: 78, cssColor: "#242d2a", touchable: true });
+      const normalLabel = new g.Label({ scene, x: 430, y: 390, anchorX: 0.5, font: font20, text: "● ノーマル（選択中）", textColor: "#ffffff" });
+      const normalDetail = new g.Label({ scene, x: 430, y: 425, anchorX: 0.5, font: font12, text: "現在の標準難易度・HP自然回復あり", textColor: "#d5e5df" });
+      const hardLabel = new g.Label({ scene, x: 850, y: 390, anchorX: 0.5, font: font20, text: "ハード", textColor: "#d4ddd9" });
+      const hardDetail = new g.Label({ scene, x: 850, y: 425, anchorX: 0.5, font: font12, text: "自然回復なし・敵強化・獲得スコア2倍", textColor: "#f2b4a8" });
+      const startButton = new g.FilledRect({ scene, x: 440, y: 500, width: 400, height: 72, cssColor: "#a45b35", touchable: true });
+      const startLabel = new g.Label({ scene, x: W / 2, y: 518, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
+      entities.push(operationTitle, ...lineLabels, difficultyTitle, normalButton, hardButton, normalLabel, normalDetail, hardLabel, hardDetail, startButton, startLabel);
+      entities.slice(3).forEach((entity) => root.append(entity));
+
+      function refreshDifficultySelection() {
+        const hard = difficultyId === "hard";
+        difficulty = Logic.difficultySettings(difficultyId);
+        g.game.vars.gameState.difficulty = difficultyId;
+        normalButton.cssColor = hard ? "#242d2a" : "#315b4b";
+        hardButton.cssColor = hard ? "#7a3f3f" : "#242d2a";
+        normalLabel.text = hard ? "ノーマル" : "● ノーマル（選択中）";
+        hardLabel.text = hard ? "● ハード（選択中）" : "ハード";
+        startLabel.text = difficulty.name + "で開始";
+        normalButton.modified(); hardButton.modified();
+        normalLabel.invalidate(); hardLabel.invalidate(); startLabel.invalidate();
+        setScore(score);
+      }
+
+      normalButton.onPointDown.add(() => { difficultyId = "normal"; refreshDifficultySelection(); });
+      hardButton.onPointDown.add(() => { difficultyId = "hard"; refreshDifficultySelection(); });
+      startButton.onPointDown.add(() => {
+        if (phase !== "ready") return;
+        entities.forEach((entity) => entity.destroy());
+        phase = "play";
+        phaseLabel.text = difficulty.name + "　防衛開始";
+        phaseLabel.invalidate();
+        showToast(difficulty.name + "で防衛開始！ 触媒を集めて召喚せよ", difficultyId === "hard" ? "#ffb0a4" : "#8ee6c3");
+      });
+      refreshDifficultySelection();
+      return { entities };
     }
 
-    const readyUi = showReadyOverlay();
+    showReadyOverlay();
     refreshInventory();
     refreshKingHp();
     refreshForcePanels();
@@ -991,18 +1050,7 @@ exports.main = function main(param) {
     }
 
     scene.onUpdate.add(() => {
-      if (phase === "ready") {
-        readyLeft -= DT;
-        readyUi.count.text = "開始まで " + Math.max(1, Math.ceil(readyLeft));
-        readyUi.count.invalidate();
-        if (readyLeft <= 0) {
-          readyUi.overlay.destroy(); readyUi.panel.destroy(); readyUi.readyTitle.destroy(); readyUi.count.destroy();
-          readyUi.lineLabels.forEach((lineLabel) => lineLabel.destroy());
-          phase = "play";
-          showToast("防衛開始！ 触媒を集めて召喚せよ", "#8ee6c3");
-        }
-        return;
-      }
+      if (phase === "ready") return;
       if (ended) { updateEffects(DT); return; }
 
       elapsed += DT;
@@ -1035,7 +1083,7 @@ exports.main = function main(param) {
       if (battlePaused) pauseIndicator.show(); else pauseIndicator.hide();
       pauseIndicator.text = battlePaused ? "② 召喚地点をタップ　戦術停止 " + summonPauseLeft.toFixed(1) : "";
       pauseIndicator.invalidate();
-      phaseLabel.text = battlePaused ? "戦術停止" : phaseName() + "　魔軍×" + Logic.monsterTierBoost(monsterTier).toFixed(2);
+      phaseLabel.text = difficulty.name + "　" + (battlePaused ? "戦術停止" : phaseName() + "　魔軍×" + Logic.monsterTierBoost(monsterTier).toFixed(2));
       phaseLabel.invalidate();
       refreshSummonGuidance();
       statusLabel.text = "軍勢 " + currentCost() + "/" + costLimit + "  死亡 " + deaths;
@@ -1052,7 +1100,7 @@ exports.main = function main(param) {
         spawnLeft -= DT;
         if (spawnLeft <= 0) {
           spawnEnemy(chooseEnemyType());
-          if (elapsed > 105 && random.generate() < 0.14) spawnEnemy(chooseEnemyType());
+          if (random.generate() < Logic.enemyExtraSpawnChance(elapsed)) spawnEnemy(chooseEnemyType());
           spawnLeft = Logic.enemySpawnInterval(elapsed);
         }
         if (!bossSpawned && elapsed >= 160) { bossSpawned = true; spawnEnemy("hero"); }

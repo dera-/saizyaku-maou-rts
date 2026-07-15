@@ -29,6 +29,17 @@ const TERRAIN = {
 
 const MONSTER_TIER_BOOSTS = [0.88, 1.15, 1.5, 2];
 
+const DIFFICULTIES = {
+  normal: {
+    id: "normal", name: "ノーマル", enemyHp: 1, enemyAttack: 1,
+    enemySpeed: 1, enemyCooldown: 1, scoreMultiplier: 1, kingRegen: 4
+  },
+  hard: {
+    id: "hard", name: "ハード", enemyHp: 1.3, enemyAttack: 1.25,
+    enemySpeed: 1.08, enemyCooldown: 0.9, scoreMultiplier: 2, kingRegen: 0
+  }
+};
+
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
@@ -54,13 +65,30 @@ function costLimit(elapsed) {
 
 function enemySpawnInterval(elapsed) {
   if (elapsed < 30) return 6.5;
-  if (elapsed < 60) return 4.9;
-  if (elapsed < 90) return 3.9;
-  return Math.max(2.45, 3.7 - (elapsed - 90) / 72);
+  if (elapsed < 45) return 4.9;
+  if (elapsed < 60) return 4.35;
+  if (elapsed < 90) return 3.55;
+  return Math.max(2.45, 3.35 - (elapsed - 90) / 100);
+}
+
+function enemyExtraSpawnChance(elapsed) {
+  if (elapsed < 45) return 0;
+  if (elapsed < 75) return 0.04;
+  if (elapsed < 105) return 0.08;
+  if (elapsed < 135) return 0.16;
+  return 0.14;
 }
 
 function monsterTierBoost(tier) {
   return MONSTER_TIER_BOOSTS[clamp(Math.floor(tier), 0, 3)];
+}
+
+function difficultySettings(id) {
+  return DIFFICULTIES[id] || DIFFICULTIES.normal;
+}
+
+function scoreAward(basePoints, difficultyId) {
+  return Math.floor(Math.max(0, basePoints) * difficultySettings(difficultyId).scoreMultiplier);
 }
 
 function scoreForKill(base, elapsed, combo, risk) {
@@ -150,7 +178,10 @@ module.exports = {
   distance,
   enemyMultiplier,
   enemySpawnInterval,
+  enemyExtraSpawnChance,
   monsterTierBoost,
+  difficultySettings,
+  scoreAward,
   corruptionTier,
   costLimit,
   scoreForKill,

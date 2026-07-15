@@ -17,9 +17,14 @@ test("経過時間に応じて腐敗段階が0から3まで上がる", () => {
 test("敵の出現間隔は序盤を長く取り、段階的に短くなる", () => {
   assert.equal(logic.enemySpawnInterval(0), 6.5);
   assert.equal(logic.enemySpawnInterval(30), 4.9);
-  assert.equal(logic.enemySpawnInterval(60), 3.9);
+  assert.equal(logic.enemySpawnInterval(45), 4.35);
+  assert.equal(logic.enemySpawnInterval(60), 3.55);
   assert.ok(logic.enemySpawnInterval(150) < 3);
   assert.ok(logic.enemySpawnInterval(180) >= 2.45);
+});
+
+test("残り135秒から45秒の中盤は敵の追加出現率が段階的に上がる", () => {
+  assert.deepEqual([44, 45, 75, 105, 135].map(logic.enemyExtraSpawnChance), [0, 0.04, 0.08, 0.16, 0.14]);
 });
 
 test("軍勢コスト上限は45秒ごとに6から15まで拡張される", () => {
@@ -28,6 +33,22 @@ test("軍勢コスト上限は45秒ごとに6から15まで拡張される", () 
 
 test("モンスターは45秒ごとに最大2倍まで強化される", () => {
   assert.deepEqual([0, 1, 2, 3].map(logic.monsterTierBoost), [0.88, 1.15, 1.5, 2]);
+});
+
+test("ハードは敵を強化し、自然回復をなくして獲得スコアを2倍にする", () => {
+  const normal = logic.difficultySettings("normal");
+  const hard = logic.difficultySettings("hard");
+  assert.equal(normal.kingRegen, 4);
+  assert.equal(normal.scoreMultiplier, 1);
+  assert.equal(hard.kingRegen, 0);
+  assert.equal(hard.scoreMultiplier, 2);
+  assert.ok(hard.enemyHp > normal.enemyHp);
+  assert.ok(hard.enemyAttack > normal.enemyAttack);
+  assert.ok(hard.enemySpeed > normal.enemySpeed);
+  assert.ok(hard.enemyCooldown < normal.enemyCooldown);
+  assert.equal(logic.scoreAward(1250, "normal"), 1250);
+  assert.equal(logic.scoreAward(1250, "hard"), 2500);
+  assert.equal(logic.difficultySettings("unknown").id, "normal");
 });
 
 test("代表レシピ名を解決する", () => {
