@@ -3,7 +3,7 @@
 const Logic = require("./gameLogic");
 
 exports.main = function main(param) {
-  const scene = new g.Scene({ game: g.game });
+  const scene = new g.Scene({ game: g.game, assetIds: ["sprites", "field"] });
   const random = param.random || g.game.random;
   g.game.vars.gameState = { score: 0 };
 
@@ -20,10 +20,49 @@ exports.main = function main(param) {
     const font20 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 20 });
     const font28 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 28, fontWeight: "bold" });
     const font42 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 42, fontWeight: "bold" });
+    const spriteAtlas = scene.asset.getImageById("sprites");
+    const fieldImage = scene.asset.getImageById("field");
+    const ATLAS_CELL = 256;
+
+    function atlasSprite(col, row, x, y, width, height, touchable) {
+      return new g.Sprite({
+        scene, src: spriteAtlas, x, y, width, height,
+        srcX: col * ATLAS_CELL, srcY: row * ATLAS_CELL,
+        srcWidth: ATLAS_CELL, srcHeight: ATLAS_CELL,
+        touchable: !!touchable
+      });
+    }
+
+    function catalystCell(id) {
+      const cells = { bone: 0, fang: 1, iron: 2, mana: 3, mushroom: 4, soul: 5 };
+      return { col: cells[id], row: 3 };
+    }
+
+    function minionCell(spec) {
+      const specials = {
+        "アーマースケルトン": { col: 1, row: 1 },
+        "スケルトンメイジ": { col: 2, row: 1 },
+        "ヴェノムハウンド": { col: 3, row: 1 },
+        "インフェルノゴーレム": { col: 4, row: 1 },
+        "レイス": { col: 5, row: 1 }
+      };
+      if (specials[spec.name]) return specials[spec.name];
+      const cells = {
+        bone: { col: 1, row: 0 }, fang: { col: 2, row: 0 }, iron: { col: 3, row: 0 },
+        mana: { col: 4, row: 0 }, mushroom: { col: 5, row: 0 }, soul: { col: 0, row: 1 }
+      };
+      return cells[spec.primary];
+    }
+
+    function enemyCell(typeId) {
+      const cells = { fighter: 0, rogue: 1, archer: 2, cleric: 3, knight: 4, hero: 5 };
+      return { col: cells[typeId], row: 2 };
+    }
 
     const root = new g.E({ scene });
     scene.append(root);
     root.append(new g.FilledRect({ scene, width: W, height: H, cssColor: "#142620" }));
+    root.append(new g.Sprite({ scene, src: fieldImage, x: 0, y: 0, width: W, height: H, opacity: 0.9 }));
 
     const terrains = [
       { id: "road", x: 0, y: 292, width: W, height: 84 },
@@ -38,7 +77,7 @@ exports.main = function main(param) {
       const info = Logic.TERRAIN[zone.id];
       const rect = new g.FilledRect({
         scene, x: zone.x, y: zone.y, width: zone.width, height: zone.height,
-        cssColor: info.color, opacity: 0.7
+        cssColor: info.color, opacity: 0.18
       });
       const label = new g.Label({
         scene, x: zone.x + 8, y: zone.y + 6, width: zone.width - 16,
@@ -61,7 +100,7 @@ exports.main = function main(param) {
       { x: W / 2 - 34, y: TOP, width: 68, height: 28, sx: W / 2, sy: TOP + 38 }
     ];
     gates.forEach((gate) => {
-      root.append(new g.FilledRect({ scene, x: gate.x, y: gate.y, width: gate.width, height: gate.height, cssColor: "#a8344f" }));
+      root.append(new g.FilledRect({ scene, x: gate.x, y: gate.y, width: gate.width, height: gate.height, cssColor: "#a8344f", opacity: 0.36 }));
     });
 
     const battlefieldInput = new g.FilledRect({
@@ -148,10 +187,7 @@ exports.main = function main(param) {
       targetX: W / 2,
       targetY: 450
     };
-    const kingBody = new g.FilledRect({
-      scene, x: king.x - 17, y: king.y - 17, width: 34, height: 34,
-      cssColor: "#d44c78", touchable: true
-    });
+    const kingBody = atlasSprite(0, 0, king.x - 28, king.y - 28, 56, 56, true);
     root.append(kingBody);
     const kingCrown = new g.Label({ scene, x: king.x, y: king.y - 31, anchorX: 0.5, font: font16, text: "魔王", textColor: "#ffe4a6" });
     root.append(kingCrown);
@@ -203,7 +239,8 @@ exports.main = function main(param) {
       const y = FIELD_BOTTOM + 27;
       const base = new g.FilledRect({ scene, x, y, width: 111, height: 82, cssColor: "#24312e", touchable: true });
       const strip = new g.FilledRect({ scene, x, y, width: 8, height: 82, cssColor: cat.color });
-      const glyph = new g.Label({ scene, x: x + 19, y: y + 8, font: font28, text: cat.glyph, textColor: cat.color });
+      const cell = catalystCell(cat.id);
+      const glyph = atlasSprite(cell.col, cell.row, x + 10, y + 4, 48, 48, false);
       const name = new g.Label({ scene, x: x + 58, y: y + 9, anchorX: 0.5, font: font16, text: cat.name, textColor: "#ffffff" });
       const count = new g.Label({ scene, x: x + 58, y: y + 43, anchorX: 0.5, font: font20, text: "×1", textColor: "#ffffff" });
       root.append(base); root.append(strip); root.append(glyph); root.append(name); root.append(count);
@@ -366,7 +403,7 @@ exports.main = function main(param) {
       });
       if (choosing) pauseBanner.show(); else pauseBanner.hide();
       terrainViews.forEach((view) => {
-        view.rect.opacity = choosing ? 0.9 : 0.7;
+        view.rect.opacity = choosing ? 0.42 : 0.18;
         view.label.opacity = choosing ? 1 : 0.86;
         view.rect.modified();
         view.label.modified();
@@ -448,13 +485,12 @@ exports.main = function main(param) {
       }
       selected.forEach((id) => { inventory[id] -= 1; });
       summonSerial += 1;
-      const body = new g.FilledRect({
-        scene, x: x - spec.size, y: y - spec.size, width: spec.size * 2, height: spec.size * 2,
-        cssColor: spec.color
-      });
+      const cell = minionCell(spec);
+      const visualSize = Math.max(38, spec.size * 2.45);
+      const body = atlasSprite(cell.col, cell.row, x - visualSize / 2, y - visualSize / 2, visualSize, visualSize, false);
       const hpBg = new g.FilledRect({ scene, x: x - 18, y: y - spec.size - 7, width: 36, height: 4, cssColor: "#251f21" });
       const hpBar = new g.FilledRect({ scene, x: x - 18, y: y - spec.size - 7, width: 36, height: 4, cssColor: "#6be08c" });
-      const mark = new g.Label({ scene, x, y: y - 9, anchorX: 0.5, font: font12, text: String(summonSerial % 10), textColor: "#17201e" });
+      const mark = new g.Label({ scene, x, y: y - 9, anchorX: 0.5, font: font12, text: "", textColor: "#17201e" });
       unitLayer.append(body); unitLayer.append(hpBg); unitLayer.append(hpBar); unitLayer.append(mark);
       minions.push({
         ...spec, x, y, hp: spec.hp, maxHp: spec.hp, body, hpBg, hpBar, mark,
@@ -486,8 +522,9 @@ exports.main = function main(param) {
     function spawnDrop(x, y, forcedId) {
       if (drops.length >= 20) return;
       const cat = forcedId ? Logic.CATALYSTS.find((c) => c.id === forcedId) : Logic.CATALYSTS[Math.floor(random.generate() * Logic.CATALYSTS.length)];
-      const body = new g.FilledRect({ scene, x: x - 10, y: y - 10, width: 20, height: 20, cssColor: cat.color, opacity: 0.95 });
-      const label = new g.Label({ scene, x, y: y - 8, anchorX: 0.5, font: font12, text: cat.glyph, textColor: "#18201e" });
+      const cell = catalystCell(cat.id);
+      const body = atlasSprite(cell.col, cell.row, x - 15, y - 15, 30, 30, false);
+      const label = new g.Label({ scene, x, y: y - 8, anchorX: 0.5, font: font12, text: "", textColor: "#18201e" });
       unitLayer.append(body); unitLayer.append(label);
       drops.push({ x, y, id: cat.id, body, label, age: 0 });
     }
@@ -526,10 +563,12 @@ exports.main = function main(param) {
       const hp = Math.round(base.hp * mult);
       const x = gate.sx;
       const y = gate.sy;
-      const body = new g.FilledRect({ scene, x: x - base.size, y: y - base.size, width: base.size * 2, height: base.size * 2, cssColor: base.color });
+      const cell = enemyCell(typeId);
+      const visualSize = Math.max(40, base.size * 2.35);
+      const body = atlasSprite(cell.col, cell.row, x - visualSize / 2, y - visualSize / 2, visualSize, visualSize, false);
       const hpBg = new g.FilledRect({ scene, x: x - 20, y: y - base.size - 7, width: 40, height: 4, cssColor: "#251f21" });
       const hpBar = new g.FilledRect({ scene, x: x - 20, y: y - base.size - 7, width: 40, height: 4, cssColor: typeId === "hero" ? "#ffd34e" : "#e46c6c" });
-      const label = new g.Label({ scene, x, y: y - 9, anchorX: 0.5, font: font12, text: typeId === "hero" ? "勇" : base.name.slice(0, 1), textColor: "#1b201e" });
+      const label = new g.Label({ scene, x, y: y - 9, anchorX: 0.5, font: font12, text: "", textColor: "#1b201e" });
       unitLayer.append(body); unitLayer.append(hpBg); unitLayer.append(hpBar); unitLayer.append(label);
       enemies.push({
         ...base, typeId, x, y, hp, maxHp: hp, attack: base.attack * mult, body, hpBg, hpBar, label,
@@ -562,8 +601,8 @@ exports.main = function main(param) {
     }
 
     function syncEntity(unit) {
-      unit.body.x = unit.x - unit.size;
-      unit.body.y = unit.y - unit.size;
+      unit.body.x = unit.x - unit.body.width / 2;
+      unit.body.y = unit.y - unit.body.height / 2;
       unit.body.modified();
       unit.hpBg.x = unit.x - (unit.maxHp > 500 ? 28 : unit.body.width > 34 ? 20 : 18);
       unit.hpBg.y = unit.y - unit.size - 7;
@@ -623,8 +662,8 @@ exports.main = function main(param) {
       moveToward(king, { x: king.targetX, y: king.targetY }, 155, dt, 1);
       king.x = Logic.clamp(king.x, 20, W - 20);
       king.y = Logic.clamp(king.y, TOP + 20, FIELD_BOTTOM - 20);
-      kingBody.x = king.x - 17; kingBody.y = king.y - 17;
-      kingCrown.x = king.x; kingCrown.y = king.y - 31;
+      kingBody.x = king.x - kingBody.width / 2; kingBody.y = king.y - kingBody.height / 2;
+      kingCrown.x = king.x; kingCrown.y = king.y - 38;
       kingBody.opacity = king.invincible > 0 && Math.floor(king.invincible * 10) % 2 ? 0.4 : 1;
       kingBody.modified(); kingCrown.modified();
     }

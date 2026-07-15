@@ -41,6 +41,13 @@
 - 鉄 + 魂火: インフェルノゴーレム
 - 魔力 + 魂火: レイス
 
+## 画像素材
+
+- `assets/sprites.png`: 魔王、味方モンスター、敵冒険者、勇者、触媒アイコンを収録した6×4の透過スプライトアトラス
+- `assets/field-game.png`: 岩場・魔力溜まり・街道・墓地・毒沼を描いた1280×720のフィールド背景
+
+画像はゲーム専用に生成したオリジナルの8-bit家庭用RPG風ピクセルアートです。スプライトはクロマキー除去後の透過PNGを使用し、Akashic Engine上ではアトラスの各セルを切り出して表示します。
+
 ## 開発
 
 ```powershell
@@ -58,3 +65,5 @@ npm start
 - `script/gameLogic.js`: 召喚レシピ、能力補正、敵強化、スコア計算
 - `script/_bootstrap.js`: ニコ生セッションパラメーターと乱数シード受け取り
 - `test/gameLogic.test.js`: 純粋ロジックの自動テスト
+- `assets/sprites.png`: キャラクター・モンスター・敵・触媒の画像アトラス
+- `assets/field-game.png`: 8-bit風フィールド背景

@@ -18,6 +18,18 @@
       "type": "script",
       "path": "script/gameLogic.js",
       "global": true
+    },
+    "sprites": {
+      "type": "image",
+      "path": "assets/sprites.png",
+      "width": 1536,
+      "height": 1024
+    },
+    "field": {
+      "type": "image",
+      "path": "assets/field-game.png",
+      "width": 1280,
+      "height": 720
     }
   },
   "environment": {
