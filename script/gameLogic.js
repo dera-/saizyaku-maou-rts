@@ -36,7 +36,7 @@ const DIFFICULTIES = {
   },
   hard: {
     id: "hard", name: "ハード", enemyHp: 1.3, enemyAttack: 1.25,
-    enemySpeed: 1.08, enemyCooldown: 0.9, scoreMultiplier: 2, kingRegen: 0
+    enemySpeed: 1.08, enemyCooldown: 0.9, scoreMultiplier: 5, kingRegen: 0
   }
 };
 

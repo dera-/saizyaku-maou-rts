@@ -132,7 +132,7 @@ exports.main = function main(param) {
 
     const topBar = new g.FilledRect({ scene, x: 0, y: 0, width: W, height: TOP, cssColor: "#0b1513", opacity: 0.96 });
     root.append(topBar);
-    const titleLabel = new g.Label({ scene, x: 18, y: 9, font: font20, text: "最弱魔王の180秒防衛戦", textColor: "#f3d78b" });
+    const titleLabel = new g.Label({ scene, x: 18, y: 9, font: font20, text: "触媒モンスター ~最弱魔王の防衛戦~", textColor: "#f3d78b" });
     root.append(titleLabel);
     const scoreLabel = new g.Label({ scene, x: 18, y: 35, font: font20, text: "SCORE 0", textColor: "#ffffff" });
     root.append(scoreLabel);
@@ -156,6 +156,7 @@ exports.main = function main(param) {
 
     let elapsed = 0;
     let phase = "ready";
+    let readyLeft = 10;
     let difficultyId = "normal";
     let difficulty = Logic.difficultySettings(difficultyId);
     let spawnLeft = 6;
@@ -270,9 +271,19 @@ exports.main = function main(param) {
       });
     });
 
-    const clearButton = new g.FilledRect({ scene, x: 1174, y: FIELD_BOTTOM + 26, width: 94, height: 34, cssColor: "#704653", touchable: true });
+    const MOBILE_CONTROL_SIZE = 104;
+    const MOBILE_CONTROL_X = W - MOBILE_CONTROL_SIZE - 8;
+    const MOBILE_CONTROL_Y = FIELD_BOTTOM + 10;
+    const clearButton = new g.FilledRect({
+      scene, x: MOBILE_CONTROL_X, y: MOBILE_CONTROL_Y + 22,
+      width: MOBILE_CONTROL_SIZE, height: 58, cssColor: "#704653", touchable: true, hidden: true
+    });
+    const clearButtonLabel = new g.Label({
+      scene, x: MOBILE_CONTROL_X + MOBILE_CONTROL_SIZE / 2, y: MOBILE_CONTROL_Y + 40,
+      anchorX: 0.5, font: font16, text: "選択解除", textColor: "#ffffff", hidden: true
+    });
     root.append(clearButton);
-    root.append(new g.Label({ scene, x: 1221, y: FIELD_BOTTOM + 34, anchorX: 0.5, font: font16, text: "選択解除", textColor: "#ffffff" }));
+    root.append(clearButtonLabel);
     clearButton.onPointDown.add(() => {
       cancelSummonSelection();
     });
@@ -284,6 +295,7 @@ exports.main = function main(param) {
 
     kingBody.onPointDown.add((_ev) => {
       if (!king.alive || phase !== "play") return;
+      releaseVirtualPad();
       kingDragStart = { x: king.x, y: king.y };
       king.targetX = king.x;
       king.targetY = king.y;
@@ -294,6 +306,81 @@ exports.main = function main(param) {
       king.targetY = Logic.clamp(kingDragStart.y + ev.startDelta.y, TOP + 24, FIELD_BOTTOM - 24);
     });
     kingBody.onPointUp.add(() => { stopKingMovement(); });
+
+    const PAD_SIZE = MOBILE_CONTROL_SIZE;
+    const PAD_CENTER = PAD_SIZE / 2;
+    const PAD_X = MOBILE_CONTROL_X;
+    const PAD_Y = MOBILE_CONTROL_Y;
+    let virtualPadActive = false;
+    const virtualPadVector = { x: 0, y: 0 };
+    const padBase = new g.FilledRect({
+      scene, x: PAD_X, y: PAD_Y, width: PAD_SIZE, height: PAD_SIZE,
+      cssColor: "#10221d", opacity: 0.55, hidden: true
+    });
+    const padHorizontal = new g.FilledRect({
+      scene, x: PAD_X + 10, y: PAD_Y + 37, width: 84, height: 30,
+      cssColor: "#8aa49a", opacity: 0.46, hidden: true
+    });
+    const padVertical = new g.FilledRect({
+      scene, x: PAD_X + 37, y: PAD_Y + 10, width: 30, height: 84,
+      cssColor: "#8aa49a", opacity: 0.46, hidden: true
+    });
+    const padKnob = new g.FilledRect({
+      scene, x: PAD_X + PAD_CENTER - 17, y: PAD_Y + PAD_CENTER - 17,
+      width: 34, height: 34, cssColor: "#e7b75d", opacity: 0.82, hidden: true
+    });
+    const padLabel = new g.Label({
+      scene, x: PAD_X + PAD_CENTER, y: PAD_Y + PAD_CENTER - 6, anchorX: 0.5,
+      font: font12, text: "MOVE", textColor: "#15201d", hidden: true
+    });
+    const padInput = new g.FilledRect({
+      scene, x: PAD_X, y: PAD_Y, width: PAD_SIZE, height: PAD_SIZE,
+      cssColor: "#ffffff", opacity: 0.001, touchable: true, hidden: true
+    });
+    const virtualPadEntities = [padBase, padHorizontal, padVertical, padKnob, padLabel, padInput];
+    virtualPadEntities.forEach((entity) => root.append(entity));
+
+    function setVirtualPadVisible(visible) {
+      virtualPadEntities.forEach((entity) => {
+        if (visible) entity.show(); else entity.hide();
+      });
+      if (!visible) releaseVirtualPad();
+    }
+
+    function releaseVirtualPad() {
+      virtualPadActive = false;
+      virtualPadVector.x = 0;
+      virtualPadVector.y = 0;
+      padKnob.x = PAD_X + PAD_CENTER - padKnob.width / 2;
+      padKnob.y = PAD_Y + PAD_CENTER - padKnob.height / 2;
+      padKnob.modified();
+    }
+
+    function applyVirtualPad(localX, localY) {
+      if (phase !== "play" || ended || !king.alive || selected.length) return;
+      const dx = localX - PAD_CENTER;
+      const dy = localY - PAD_CENTER;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const strength = Math.min(1, distance / 48);
+      if (distance < 9) {
+        virtualPadVector.x = 0;
+        virtualPadVector.y = 0;
+      } else {
+        virtualPadVector.x = dx / distance * strength;
+        virtualPadVector.y = dy / distance * strength;
+      }
+      virtualPadActive = true;
+      kingDragStart = null;
+      king.targetX = king.x;
+      king.targetY = king.y;
+      padKnob.x = PAD_X + PAD_CENTER - padKnob.width / 2 + virtualPadVector.x * 27;
+      padKnob.y = PAD_Y + PAD_CENTER - padKnob.height / 2 + virtualPadVector.y * 27;
+      padKnob.modified();
+    }
+
+    padInput.onPointDown.add((ev) => { applyVirtualPad(ev.point.x, ev.point.y); });
+    padInput.onPointMove.add((ev) => { applyVirtualPad(ev.point.x + ev.startDelta.x, ev.point.y + ev.startDelta.y); });
+    padInput.onPointUp.add(() => { releaseVirtualPad(); });
 
     function terrainAt(x, y) {
       for (let i = terrains.length - 1; i >= 0; --i) {
@@ -332,6 +419,7 @@ exports.main = function main(param) {
       kingDragStart = null;
       king.targetX = king.x;
       king.targetY = king.y;
+      releaseVirtualPad();
     }
 
     function cancelSummonSelection() {
@@ -347,7 +435,7 @@ exports.main = function main(param) {
     function setScore(value) {
       score = Math.max(0, Math.floor(value));
       g.game.vars.gameState.score = score;
-      scoreLabel.text = "SCORE " + score + (difficulty.scoreMultiplier > 1 ? "  HARD×2" : "");
+      scoreLabel.text = "SCORE " + score + (difficultyId === "hard" ? "  HARD（スコア5倍）" : "");
       scoreLabel.invalidate();
     }
 
@@ -425,6 +513,14 @@ exports.main = function main(param) {
         view.rect.modified();
         view.label.modified();
       });
+      setVirtualPadVisible(phase === "play" && !choosing && king.alive && !ended);
+      if (choosing) {
+        clearButton.show();
+        clearButtonLabel.show();
+      } else {
+        clearButton.hide();
+        clearButtonLabel.hide();
+      }
     }
 
     function tacticName(id) {
@@ -684,7 +780,12 @@ exports.main = function main(param) {
         king.hp = Math.min(king.maxHp, king.hp + difficulty.kingRegen * dt);
         refreshKingHp();
       }
-      moveToward(king, { x: king.targetX, y: king.targetY }, 155, dt, 1);
+      if (virtualPadActive) {
+        king.x += virtualPadVector.x * 155 * dt;
+        king.y += virtualPadVector.y * 155 * dt;
+      } else {
+        moveToward(king, { x: king.targetX, y: king.targetY }, 155, dt, 1);
+      }
       king.x = Logic.clamp(king.x, 20, W - 20);
       king.y = Logic.clamp(king.y, TOP + 20, FIELD_BOTTOM - 20);
       kingBody.x = king.x - kingBody.width / 2; kingBody.y = king.y - kingBody.height / 2;
@@ -983,16 +1084,15 @@ exports.main = function main(param) {
       root.append(new g.Label({ scene, x: W / 2, y: 230, anchorX: 0.5, font: font42, text: "SCORE  " + score, textColor: "#ffffff" }));
       root.append(new g.Label({ scene, x: W / 2, y: 310, anchorX: 0.5, font: font20, text: difficulty.name + "　勇者 " + (bossDefeated ? "撃破" : "生存") + "　魔王死亡 " + deaths + "回　最大軍勢 " + FINAL_COST_LIMIT, textColor: "#c9d9d1" }));
       if (deaths === 0) root.append(new g.Label({ scene, x: W / 2, y: 355, anchorX: 0.5, font: font28, text: "ノーデスボーナス +" + noDeathBonus, textColor: "#8ee6c3" }));
-      root.append(new g.Label({ scene, x: W / 2, y: 430, anchorX: 0.5, font: font16, text: "ランキングへスコアを送信中…", textColor: "#aebdb8" }));
       if (g.game.requestSaveScore) g.game.requestSaveScore(score);
     }
 
     function showReadyOverlay() {
       const overlay = new g.FilledRect({ scene, width: W, height: H, cssColor: "#07100e", opacity: 0.88 });
       const panel = new g.FilledRect({ scene, x: 170, y: 70, width: 940, height: 570, cssColor: "#172923" });
-      const readyTitle = new g.Label({ scene, x: W / 2, y: 94, anchorX: 0.5, font: font42, text: "最弱魔王の180秒防衛戦", textColor: "#f3d78b" });
+      const readyTitle = new g.Label({ scene, x: W / 2, y: 94, anchorX: 0.5, font: font42, text: "触媒モンスター ~最弱魔王の防衛戦~", textColor: "#f3d78b" });
       const lines = [
-        "魔王をドラッグして移動し、触媒アイテムを集める",
+        "魔王をドラッグ／右下のパッドで移動し、触媒を集める",
         "画面下の触媒を1～3個タップして選ぶ",
         "光った戦場をタップしてモンスターを召喚する"
       ];
@@ -1006,10 +1106,11 @@ exports.main = function main(param) {
       const normalLabel = new g.Label({ scene, x: 430, y: 390, anchorX: 0.5, font: font20, text: "● ノーマル（選択中）", textColor: "#ffffff" });
       const normalDetail = new g.Label({ scene, x: 430, y: 425, anchorX: 0.5, font: font12, text: "現在の標準難易度・HP自然回復あり", textColor: "#d5e5df" });
       const hardLabel = new g.Label({ scene, x: 850, y: 390, anchorX: 0.5, font: font20, text: "ハード", textColor: "#d4ddd9" });
-      const hardDetail = new g.Label({ scene, x: 850, y: 425, anchorX: 0.5, font: font12, text: "自然回復なし・敵強化・獲得スコア2倍", textColor: "#f2b4a8" });
-      const startButton = new g.FilledRect({ scene, x: 440, y: 500, width: 400, height: 72, cssColor: "#a45b35", touchable: true });
-      const startLabel = new g.Label({ scene, x: W / 2, y: 518, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
-      entities.push(operationTitle, ...lineLabels, difficultyTitle, normalButton, hardButton, normalLabel, normalDetail, hardLabel, hardDetail, startButton, startLabel);
+      const hardDetail = new g.Label({ scene, x: 850, y: 425, anchorX: 0.5, font: font12, text: "自然回復なし・敵強化・獲得スコア5倍", textColor: "#f2b4a8" });
+      const startButton = new g.FilledRect({ scene, x: 440, y: 488, width: 400, height: 72, cssColor: "#a45b35", touchable: true });
+      const startLabel = new g.Label({ scene, x: W / 2, y: 506, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
+      const countdownLabel = new g.Label({ scene, x: W / 2, y: 585, anchorX: 0.5, font: font20, text: "自動開始まで 10", textColor: "#f3d78b" });
+      entities.push(operationTitle, ...lineLabels, difficultyTitle, normalButton, hardButton, normalLabel, normalDetail, hardLabel, hardDetail, startButton, startLabel, countdownLabel);
       entities.slice(3).forEach((entity) => root.append(entity));
 
       function refreshDifficultySelection() {
@@ -1028,19 +1129,20 @@ exports.main = function main(param) {
 
       normalButton.onPointDown.add(() => { difficultyId = "normal"; refreshDifficultySelection(); });
       hardButton.onPointDown.add(() => { difficultyId = "hard"; refreshDifficultySelection(); });
-      startButton.onPointDown.add(() => {
+      function beginGame() {
         if (phase !== "ready") return;
         entities.forEach((entity) => entity.destroy());
         phase = "play";
         phaseLabel.text = difficulty.name + "　防衛開始";
         phaseLabel.invalidate();
         showToast(difficulty.name + "で防衛開始！ 触媒を集めて召喚せよ", difficultyId === "hard" ? "#ffb0a4" : "#8ee6c3");
-      });
+      }
+      startButton.onPointDown.add(beginGame);
       refreshDifficultySelection();
-      return { entities };
+      return { beginGame, countdownLabel };
     }
 
-    showReadyOverlay();
+    const readyUi = showReadyOverlay();
     refreshInventory();
     refreshKingHp();
     refreshForcePanels();
@@ -1050,7 +1152,13 @@ exports.main = function main(param) {
     }
 
     scene.onUpdate.add(() => {
-      if (phase === "ready") return;
+      if (phase === "ready") {
+        readyLeft -= DT;
+        readyUi.countdownLabel.text = "自動開始まで " + Math.max(1, Math.ceil(readyLeft));
+        readyUi.countdownLabel.invalidate();
+        if (readyLeft <= 0) readyUi.beginGame();
+        return;
+      }
       if (ended) { updateEffects(DT); return; }
 
       elapsed += DT;

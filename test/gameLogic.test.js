@@ -35,19 +35,19 @@ test("モンスターは45秒ごとに最大2倍まで強化される", () => {
   assert.deepEqual([0, 1, 2, 3].map(logic.monsterTierBoost), [0.88, 1.15, 1.5, 2]);
 });
 
-test("ハードは敵を強化し、自然回復をなくして獲得スコアを2倍にする", () => {
+test("ハードは敵を強化し、自然回復をなくして獲得スコアを5倍にする", () => {
   const normal = logic.difficultySettings("normal");
   const hard = logic.difficultySettings("hard");
   assert.equal(normal.kingRegen, 4);
   assert.equal(normal.scoreMultiplier, 1);
   assert.equal(hard.kingRegen, 0);
-  assert.equal(hard.scoreMultiplier, 2);
+  assert.equal(hard.scoreMultiplier, 5);
   assert.ok(hard.enemyHp > normal.enemyHp);
   assert.ok(hard.enemyAttack > normal.enemyAttack);
   assert.ok(hard.enemySpeed > normal.enemySpeed);
   assert.ok(hard.enemyCooldown < normal.enemyCooldown);
   assert.equal(logic.scoreAward(1250, "normal"), 1250);
-  assert.equal(logic.scoreAward(1250, "hard"), 2500);
+  assert.equal(logic.scoreAward(1250, "hard"), 6250);
   assert.equal(logic.difficultySettings("unknown").id, "normal");
 });
 
@@ -74,6 +74,15 @@ test("コンボと危険撃破でスコアが増える", () => {
   assert.ok(bonus > normal * 2);
 });
 
-test("死亡ペナルティは死亡回数に応じて増える", () => {
-  assert.deepEqual([0, 1, 2].map(logic.deathPenalty), [1500, 2000, 2500]);
+test("ハードでは勇者以外の通常敵撃破スコアも5倍になる", () => {
+  const fighterKill = logic.scoreForKill(100, 0, 1, false);
+  assert.equal(logic.scoreAward(fighterKill, "normal"), 100);
+  assert.equal(logic.scoreAward(fighterKill, "hard"), 500);
+});
+
+test("死亡ペナルティはノーマルとハードで共通かつ死亡回数に応じて増える", () => {
+  const normal = [0, 1, 2].map((deaths) => logic.deathPenalty(deaths));
+  const hard = [0, 1, 2].map((deaths) => logic.deathPenalty(deaths));
+  assert.deepEqual(normal, [1500, 2000, 2500]);
+  assert.deepEqual(hard, normal);
 });
