@@ -3,7 +3,13 @@
 const Logic = require("./gameLogic");
 
 exports.main = function main(param) {
-  const scene = new g.Scene({ game: g.game, assetIds: ["sprites", "field"] });
+  const scene = new g.Scene({
+    game: g.game,
+    assetIds: [
+      "sprites", "field", "gameBgm", "itemPickupSe", "summonSe", "monsterDeathSe",
+      "kingDamageSe", "kingDeathSe", "enemyDefeatSe", "heroAppearSe", "heroDefeatSe", "gameEndSe"
+    ]
+  });
   const random = param.random || g.game.random;
   g.game.vars.gameState = { score: 0, difficulty: "normal" };
 
@@ -23,6 +29,17 @@ exports.main = function main(param) {
     const spriteAtlas = scene.asset.getImageById("sprites");
     const fieldImage = scene.asset.getImageById("field");
     const ATLAS_CELL = 256;
+    const seCooldownUntil = {};
+    const gameBgmPlayer = scene.asset.getAudioById("gameBgm").play();
+    gameBgmPlayer.changeVolume(0.32);
+
+    function playSe(assetId, volume, cooldown) {
+      const now = g.game.age / g.game.fps;
+      if (seCooldownUntil[assetId] && seCooldownUntil[assetId] > now) return;
+      seCooldownUntil[assetId] = now + (cooldown || 0);
+      const player = scene.asset.getAudioById(assetId).play();
+      player.changeVolume(volume == null ? 0.7 : volume);
+    }
 
     function atlasSprite(col, row, x, y, width, height, touchable) {
       return new g.Sprite({
@@ -609,6 +626,7 @@ exports.main = function main(param) {
         ...spec, x, y, hp: spec.hp, maxHp: spec.hp, body, hpBg, hpBar, mark,
         attackLeft: random.generate() * 0.4, age: 0, poisonTick: 0, id: summonSerial
       });
+      playSe("summonSe", 0.72, 0.1);
       burst(x, y, spec.color, 6);
       showToast(spec.name + " 召喚！ " + Logic.TERRAIN[terrain].name + "［" + Logic.TERRAIN[terrain].effect + "］", spec.color);
       selected = [];
@@ -651,6 +669,7 @@ exports.main = function main(param) {
       inventory[drop.id] = Math.min(9, inventory[drop.id] + 1);
       drop.body.destroy(); drop.label.destroy();
       drops.splice(index, 1);
+      playSe("itemPickupSe", collectorName === "king" ? 0.62 : 0.48, 0.08);
       refreshInventory();
       if (collectorName === "king") burst(drop.x, drop.y, "#ffffff", 3);
     }
@@ -696,7 +715,10 @@ exports.main = function main(param) {
         attackLeft: random.generate() * 0.5, poisonLeft: 0, poisonTick: 0, scatterTarget: null
       });
       if (!king.alive) assignScatterTarget(enemies[enemies.length - 1]);
-      if (typeId === "hero") showToast("勇者襲来！ 魔王を最優先で狙っています", "#ffd34e");
+      if (typeId === "hero") {
+        playSe("heroAppearSe", 0.9);
+        showToast("勇者襲来！ 魔王を最優先で狙っています", "#ffd34e");
+      }
     }
 
     function nearest(origin, list, filter) {
@@ -808,6 +830,7 @@ exports.main = function main(param) {
       kingBody.modified(); kingCrown.modified();
       enemies.forEach(assignScatterTarget);
       refreshKingHp();
+      playSe("kingDeathSe", 0.95);
       burst(king.x, king.y, "#ff4d7a", 12);
       showToast("魔王死亡！ 3秒後復活  -" + penalty, "#ff7b96");
     }
@@ -850,6 +873,7 @@ exports.main = function main(param) {
         }
         syncEntity(m);
         if (m.hp <= 0) {
+          playSe("monsterDeathSe", 0.55, 0.08);
           burst(m.x, m.y, m.color, 5);
           destroyUnit(m);
           minions.splice(i, 1);
@@ -907,7 +931,12 @@ exports.main = function main(param) {
             baseGained += Math.floor(Math.max(0, GAME_TIME - elapsed) * 150);
           }
           const gained = awardScore(baseGained);
-          if (e.typeId === "hero") showToast("勇者撃破！ ＋" + gained, "#ffe470");
+          if (e.typeId === "hero") {
+            playSe("heroDefeatSe", 0.9);
+            showToast("勇者撃破！ ＋" + gained, "#ffe470");
+          } else {
+            playSe("enemyDefeatSe", 0.5, 0.07);
+          }
           if (random.generate() < 0.38 || e.typeId === "hero") spawnDrop(e.x, e.y);
           burst(e.x, e.y, e.color, e.typeId === "hero" ? 18 : 6);
           destroyUnit(e);
@@ -950,6 +979,7 @@ exports.main = function main(param) {
       burst(king.x, king.y, "#ff5c83", 4);
       refreshKingHp();
       if (king.hp <= 0) killKing();
+      else playSe("kingDamageSe", 0.72, 0.12);
     }
 
     function applyDamage(target, amount, color, poison) {
@@ -1077,6 +1107,8 @@ exports.main = function main(param) {
       if (ended) return;
       ended = true;
       phase = "end";
+      gameBgmPlayer.stop();
+      playSe("gameEndSe", 0.9);
       const noDeathBonus = deaths === 0 ? awardScore(4000) : 0;
       const overlay = new g.FilledRect({ scene, width: W, height: H, cssColor: "#07100e", opacity: 0.9 });
       root.append(overlay);
@@ -1110,7 +1142,8 @@ exports.main = function main(param) {
       const startButton = new g.FilledRect({ scene, x: 440, y: 488, width: 400, height: 72, cssColor: "#a45b35", touchable: true });
       const startLabel = new g.Label({ scene, x: W / 2, y: 506, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
       const countdownLabel = new g.Label({ scene, x: W / 2, y: 585, anchorX: 0.5, font: font20, text: "自動開始まで 10", textColor: "#f3d78b" });
-      entities.push(operationTitle, ...lineLabels, difficultyTitle, normalButton, hardButton, normalLabel, normalDetail, hardLabel, hardDetail, startButton, startLabel, countdownLabel);
+      const audioCredit = new g.Label({ scene, x: W / 2, y: 616, anchorX: 0.5, font: font12, text: "BGM・効果音：魔王魂（森田交一）", textColor: "#aebdb7" });
+      entities.push(operationTitle, ...lineLabels, difficultyTitle, normalButton, hardButton, normalLabel, normalDetail, hardLabel, hardDetail, startButton, startLabel, countdownLabel, audioCredit);
       entities.slice(3).forEach((entity) => root.append(entity));
 
       function refreshDifficultySelection() {

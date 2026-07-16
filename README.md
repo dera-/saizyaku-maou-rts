@@ -52,6 +52,28 @@
 
 画像はゲーム専用に生成したオリジナルの8-bit家庭用RPG風ピクセルアートです。スプライトはクロマキー除去後の透過PNGを使用し、Akashic Engine上ではアトラスの各セルを切り出して表示します。
 
+## BGM・効果音素材
+
+音楽・効果音：魔王魂（作曲：森田交一）
+
+Akashic Engineの対応環境に合わせ、各素材のOGG版とM4A版を `assets/audio` に収録しています。魔王魂の利用ルールに従い、直接ダウンロードURLではなく各素材の公式配布ページURLを記載します。
+
+| 用途 | 使用素材 | 公式配布ページ |
+| --- | --- | --- |
+| ゲームBGM（開始画面～ゲーム終了） | 8bit07「けっせん」ループ版 | https://maou.audio/bgm_8bit07/ |
+| アイテム取得SE | レトロ03 | https://maou.audio/se_8bit03/ |
+| モンスター召喚SE | レトロ15 | https://maou.audio/se_8bit15/ |
+| モンスター死亡SE | レトロ12 | https://maou.audio/se_8bit12/ |
+| 魔王被ダメージSE | レトロ07 | https://maou.audio/se_8bit07/ |
+| 魔王死亡SE | レトロ06 | https://maou.audio/se_8bit06/ |
+| 敵撃破SE | レトロ05 | https://maou.audio/se_8bit05/ |
+| 勇者出現SE | レトロ17 | https://maou.audio/se_8bit17/ |
+| 勇者撃破SE | ジングル02 | https://maou.audio/game_jingle02/ |
+| ゲーム終了時SE | ジングル03 | https://maou.audio/game_jingle03/ |
+
+- 魔王魂: https://maou.audio/
+- 音楽利用のルール: https://maou.audio/rule/
+
 ## 開発
 
 ```powershell
@@ -71,3 +93,4 @@ npm start
 - `test/gameLogic.test.js`: 純粋ロジックの自動テスト
 - `assets/sprites.png`: キャラクター・モンスター・敵・触媒の画像アトラス
 - `assets/field-game.png`: 8-bit風フィールド背景
+- `assets/audio/`: 魔王魂のBGM・効果音（OGG/M4A）

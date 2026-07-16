@@ -30,6 +30,67 @@
       "path": "assets/field-game.png",
       "width": 1280,
       "height": 720
+    },
+    "gameBgm": {
+      "type": "audio",
+      "path": "assets/audio/maou_loop_bgm_8bit07",
+      "systemId": "music",
+      "duration": 92400,
+      "loop": true
+    },
+    "itemPickupSe": {
+      "type": "audio",
+      "path": "assets/audio/maou_se_8bit03",
+      "systemId": "sound",
+      "duration": 330
+    },
+    "summonSe": {
+      "type": "audio",
+      "path": "assets/audio/maou_se_8bit15",
+      "systemId": "sound",
+      "duration": 1104
+    },
+    "monsterDeathSe": {
+      "type": "audio",
+      "path": "assets/audio/maou_se_8bit12",
+      "systemId": "sound",
+      "duration": 558
+    },
+    "kingDamageSe": {
+      "type": "audio",
+      "path": "assets/audio/maou_se_8bit07",
+      "systemId": "sound",
+      "duration": 342
+    },
+    "kingDeathSe": {
+      "type": "audio",
+      "path": "assets/audio/maou_se_8bit06",
+      "systemId": "sound",
+      "duration": 570
+    },
+    "enemyDefeatSe": {
+      "type": "audio",
+      "path": "assets/audio/maou_se_8bit05",
+      "systemId": "sound",
+      "duration": 570
+    },
+    "heroAppearSe": {
+      "type": "audio",
+      "path": "assets/audio/maou_se_8bit17",
+      "systemId": "sound",
+      "duration": 414
+    },
+    "heroDefeatSe": {
+      "type": "audio",
+      "path": "assets/audio/maou_game_jingle02",
+      "systemId": "sound",
+      "duration": 6531
+    },
+    "gameEndSe": {
+      "type": "audio",
+      "path": "assets/audio/maou_game_jingle03",
+      "systemId": "sound",
+      "duration": 11468
     }
   },
   "environment": {
