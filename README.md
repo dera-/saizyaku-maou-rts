@@ -54,25 +54,27 @@
 
 ## BGM・効果音素材
 
-音楽・効果音：魔王魂（作曲：森田交一）
+音楽・効果音：魔王魂（作曲：森田交一）、効果音ラボ
 
-Akashic Engineの対応環境に合わせ、各素材のOGG版とM4A版を `assets/audio` に収録しています。魔王魂の利用ルールに従い、直接ダウンロードURLではなく各素材の公式配布ページURLを記載します。
+Akashic Engineの対応環境に合わせ、各素材のOGG版とM4A版を `assets/audio` に収録しています。素材の取得元として、各素材を確認できる公式配布ページURLを記載します。
 
 | 用途 | 使用素材 | 公式配布ページ |
 | --- | --- | --- |
 | ゲームBGM（開始画面～ゲーム終了） | 8bit07「けっせん」ループ版 | https://maou.audio/bgm_8bit07/ |
 | アイテム取得SE | レトロ03 | https://maou.audio/se_8bit03/ |
-| モンスター召喚SE | レトロ15 | https://maou.audio/se_8bit15/ |
+| モンスター召喚SE | 魔法陣を展開 | https://soundeffect-lab.info/sound/battle/ |
 | モンスター死亡SE | レトロ12 | https://maou.audio/se_8bit12/ |
 | 魔王被ダメージSE | レトロ07 | https://maou.audio/se_8bit07/ |
 | 魔王死亡SE | レトロ06 | https://maou.audio/se_8bit06/ |
 | 敵撃破SE | レトロ05 | https://maou.audio/se_8bit05/ |
-| 勇者出現SE | レトロ17 | https://maou.audio/se_8bit17/ |
+| 勇者出現SE | 文字表示の衝撃音2 | https://soundeffect-lab.info/sound/anime/ |
 | 勇者撃破SE | ジングル02 | https://maou.audio/game_jingle02/ |
 | ゲーム終了時SE | ジングル03 | https://maou.audio/game_jingle03/ |
 
 - 魔王魂: https://maou.audio/
 - 音楽利用のルール: https://maou.audio/rule/
+- 効果音ラボ: https://soundeffect-lab.info/
+- 効果音ラボ利用規約: https://soundeffect-lab.info/agreement/
 
 ## 開発
 
@@ -93,4 +95,4 @@ npm start
 - `test/gameLogic.test.js`: 純粋ロジックの自動テスト
 - `assets/sprites.png`: キャラクター・モンスター・敵・触媒の画像アトラス
 - `assets/field-game.png`: 8-bit風フィールド背景
-- `assets/audio/`: 魔王魂のBGM・効果音（OGG/M4A）
+- `assets/audio/`: 魔王魂・効果音ラボのBGM／効果音（OGG/M4A）

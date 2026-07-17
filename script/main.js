@@ -99,12 +99,15 @@ exports.main = function main(param) {
     const terrainViews = [];
     terrains.forEach((zone) => {
       const info = Logic.TERRAIN[zone.id];
+      const labelX = zone.x + (zone.id === "road" ? 44 : 8);
+      const labelY = zone.id === "rock" ? zone.y - 16 : zone.y + 6;
+      const labelWidth = zone.width - (zone.id === "road" ? 52 : 16);
       const rect = new g.FilledRect({
         scene, x: zone.x, y: zone.y, width: zone.width, height: zone.height,
         cssColor: info.color, opacity: 0.18
       });
       const label = new g.Label({
-        scene, x: zone.x + 8, y: zone.y + 6, width: zone.width - 16,
+        scene, x: labelX, y: labelY, width: labelWidth,
         font: font12, text: info.name + "：" + info.effect,
         textColor: "#eef8f3", opacity: 0.86
       });
@@ -153,7 +156,7 @@ exports.main = function main(param) {
     root.append(titleLabel);
     const scoreLabel = new g.Label({ scene, x: 18, y: 35, font: font20, text: "SCORE 0", textColor: "#ffffff" });
     root.append(scoreLabel);
-    const timeLabel = new g.Label({ scene, x: W / 2, y: 8, anchorX: 0.5, font: font42, text: "180", textColor: "#ffffff" });
+    const timeLabel = new g.Label({ scene, x: W / 2, y: 0, anchorX: 0.5, font: font42, text: "180", textColor: "#ffffff" });
     root.append(timeLabel);
     const phaseLabel = new g.Label({ scene, x: W / 2, y: 48, anchorX: 0.5, font: font12, text: "準備", textColor: "#8ee6c3" });
     root.append(phaseLabel);
@@ -1109,7 +1112,7 @@ exports.main = function main(param) {
       phase = "end";
       gameBgmPlayer.stop();
       playSe("gameEndSe", 0.9);
-      const noDeathBonus = deaths === 0 ? awardScore(4000) : 0;
+      const noDeathBonus = deaths === 0 ? awardScore(3000) : 0;
       const overlay = new g.FilledRect({ scene, width: W, height: H, cssColor: "#07100e", opacity: 0.9 });
       root.append(overlay);
       root.append(new g.Label({ scene, x: W / 2, y: 150, anchorX: 0.5, font: font42, text: "防衛戦終了", textColor: "#f3d78b" }));
@@ -1142,8 +1145,7 @@ exports.main = function main(param) {
       const startButton = new g.FilledRect({ scene, x: 440, y: 488, width: 400, height: 72, cssColor: "#a45b35", touchable: true });
       const startLabel = new g.Label({ scene, x: W / 2, y: 506, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
       const countdownLabel = new g.Label({ scene, x: W / 2, y: 585, anchorX: 0.5, font: font20, text: "自動開始まで 10", textColor: "#f3d78b" });
-      const audioCredit = new g.Label({ scene, x: W / 2, y: 616, anchorX: 0.5, font: font12, text: "BGM・効果音：魔王魂（森田交一）", textColor: "#aebdb7" });
-      entities.push(operationTitle, ...lineLabels, difficultyTitle, normalButton, hardButton, normalLabel, normalDetail, hardLabel, hardDetail, startButton, startLabel, countdownLabel, audioCredit);
+      entities.push(operationTitle, ...lineLabels, difficultyTitle, normalButton, hardButton, normalLabel, normalDetail, hardLabel, hardDetail, startButton, startLabel, countdownLabel);
       entities.slice(3).forEach((entity) => root.append(entity));
 
       function refreshDifficultySelection() {

@@ -46,9 +46,9 @@
     },
     "summonSe": {
       "type": "audio",
-      "path": "assets/audio/maou_se_8bit15",
+      "path": "assets/audio/soundeffect-lab_magic-circle1",
       "systemId": "sound",
-      "duration": 1104
+      "duration": 3499
     },
     "monsterDeathSe": {
       "type": "audio",
@@ -76,9 +76,9 @@
     },
     "heroAppearSe": {
       "type": "audio",
-      "path": "assets/audio/maou_se_8bit17",
+      "path": "assets/audio/soundeffect-lab_text-impact2",
       "systemId": "sound",
-      "duration": 414
+      "duration": 2136
     },
     "heroDefeatSe": {
       "type": "audio",
@@ -98,7 +98,7 @@
     "nicolive": {
       "supportedModes": ["ranking"],
       "preferredSessionParameters": {
-        "totalTimeLimit": 195
+        "totalTimeLimit": 200
       }
     }
   }
