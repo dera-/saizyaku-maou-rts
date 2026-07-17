@@ -1,105 +1,172 @@
 {
-  "width": 1280,
-  "height": 720,
-  "fps": 30,
-  "main": "./script/_bootstrap.js",
-  "assets": {
-    "_bootstrap": {
-      "type": "script",
-      "path": "script/_bootstrap.js",
-      "global": true
-    },
-    "main": {
-      "type": "script",
-      "path": "script/main.js",
-      "global": true
-    },
-    "gameLogic": {
-      "type": "script",
-      "path": "script/gameLogic.js",
-      "global": true
-    },
-    "sprites": {
-      "type": "image",
-      "path": "assets/sprites.png",
-      "width": 1536,
-      "height": 1024
-    },
-    "field": {
-      "type": "image",
-      "path": "assets/field-game.png",
-      "width": 1280,
-      "height": 720
-    },
-    "gameBgm": {
-      "type": "audio",
-      "path": "assets/audio/maou_loop_bgm_8bit07",
-      "systemId": "music",
-      "duration": 92400,
-      "loop": true
-    },
-    "itemPickupSe": {
-      "type": "audio",
-      "path": "assets/audio/maou_se_8bit03",
-      "systemId": "sound",
-      "duration": 330
-    },
-    "summonSe": {
-      "type": "audio",
-      "path": "assets/audio/soundeffect-lab_magic-circle1",
-      "systemId": "sound",
-      "duration": 3499
-    },
-    "monsterDeathSe": {
-      "type": "audio",
-      "path": "assets/audio/maou_se_8bit12",
-      "systemId": "sound",
-      "duration": 558
-    },
-    "kingDamageSe": {
-      "type": "audio",
-      "path": "assets/audio/maou_se_8bit07",
-      "systemId": "sound",
-      "duration": 342
-    },
-    "kingDeathSe": {
-      "type": "audio",
-      "path": "assets/audio/maou_se_8bit06",
-      "systemId": "sound",
-      "duration": 570
-    },
-    "enemyDefeatSe": {
-      "type": "audio",
-      "path": "assets/audio/maou_se_8bit05",
-      "systemId": "sound",
-      "duration": 570
-    },
-    "heroAppearSe": {
-      "type": "audio",
-      "path": "assets/audio/soundeffect-lab_text-impact2",
-      "systemId": "sound",
-      "duration": 2136
-    },
-    "heroDefeatSe": {
-      "type": "audio",
-      "path": "assets/audio/maou_game_jingle02",
-      "systemId": "sound",
-      "duration": 6531
-    },
-    "gameEndSe": {
-      "type": "audio",
-      "path": "assets/audio/maou_game_jingle03",
-      "systemId": "sound",
-      "duration": 11468
-    }
-  },
-  "environment": {
-    "sandbox-runtime": "3",
-    "nicolive": {
-      "supportedModes": ["ranking"],
-      "preferredSessionParameters": {
-        "totalTimeLimit": 200
-      }
-    }
-  }
+	"width": 1280,
+	"height": 720,
+	"fps": 30,
+	"renderers": [
+		"webgl",
+		"canvas"
+	],
+	"main": "./script/_bootstrap.js",
+	"assets": {
+		"_bootstrap": {
+			"type": "script",
+			"path": "script/_bootstrap.js",
+			"global": true
+		},
+		"main": {
+			"type": "script",
+			"path": "script/main.js",
+			"global": true
+		},
+		"gameLogic": {
+			"type": "script",
+			"path": "script/gameLogic.js",
+			"global": true
+		},
+		"sprites": {
+			"type": "image",
+			"path": "assets/sprites.png",
+			"width": 1536,
+			"height": 1024
+		},
+		"field": {
+			"type": "image",
+			"path": "assets/field-game.png",
+			"width": 1280,
+			"height": 720
+		},
+		"gameBgm": {
+			"type": "audio",
+			"path": "assets/audio/maou_loop_bgm_8bit07",
+			"systemId": "music",
+			"duration": 92400,
+			"loop": true,
+			"hint": {
+				"streaming": true,
+				"extensions": [
+					".m4a",
+					".ogg"
+				]
+			}
+		},
+		"itemPickupSe": {
+			"type": "audio",
+			"path": "assets/audio/maou_se_8bit03",
+			"systemId": "sound",
+			"duration": 330,
+			"hint": {
+				"extensions": [
+					".m4a",
+					".ogg"
+				]
+			}
+		},
+		"summonSe": {
+			"type": "audio",
+			"path": "assets/audio/soundeffect-lab_magic-circle1",
+			"systemId": "sound",
+			"duration": 3499,
+			"hint": {
+				"extensions": [
+					".m4a",
+					".ogg"
+				]
+			}
+		},
+		"monsterDeathSe": {
+			"type": "audio",
+			"path": "assets/audio/maou_se_8bit12",
+			"systemId": "sound",
+			"duration": 558,
+			"hint": {
+				"extensions": [
+					".m4a",
+					".ogg"
+				]
+			}
+		},
+		"kingDamageSe": {
+			"type": "audio",
+			"path": "assets/audio/maou_se_8bit07",
+			"systemId": "sound",
+			"duration": 342,
+			"hint": {
+				"extensions": [
+					".m4a",
+					".ogg"
+				]
+			}
+		},
+		"kingDeathSe": {
+			"type": "audio",
+			"path": "assets/audio/maou_se_8bit06",
+			"systemId": "sound",
+			"duration": 570,
+			"hint": {
+				"extensions": [
+					".m4a",
+					".ogg"
+				]
+			}
+		},
+		"enemyDefeatSe": {
+			"type": "audio",
+			"path": "assets/audio/maou_se_8bit05",
+			"systemId": "sound",
+			"duration": 570,
+			"hint": {
+				"extensions": [
+					".m4a",
+					".ogg"
+				]
+			}
+		},
+		"heroAppearSe": {
+			"type": "audio",
+			"path": "assets/audio/soundeffect-lab_text-impact2",
+			"systemId": "sound",
+			"duration": 2136,
+			"hint": {
+				"extensions": [
+					".m4a",
+					".ogg"
+				]
+			}
+		},
+		"heroDefeatSe": {
+			"type": "audio",
+			"path": "assets/audio/maou_game_jingle02",
+			"systemId": "sound",
+			"duration": 6531,
+			"hint": {
+				"extensions": [
+					".m4a",
+					".ogg"
+				]
+			}
+		},
+		"gameEndSe": {
+			"type": "audio",
+			"path": "assets/audio/maou_game_jingle03",
+			"systemId": "sound",
+			"duration": 11468,
+			"hint": {
+				"extensions": [
+					".m4a",
+					".ogg"
+				]
+			}
+		}
+	},
+	"environment": {
+		"sandbox-runtime": "3",
+		"nicolive": {
+			"supportedModes": [
+				"ranking"
+			],
+			"preferredSessionParameters": {
+				"totalTimeLimit": 200
+			}
+		}
+	}
 }

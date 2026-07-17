@@ -2,12 +2,16 @@
 
 const Logic = require("./gameLogic");
 
+const AUDIO_ASSET_IDS = [
+  "gameBgm", "itemPickupSe", "summonSe", "monsterDeathSe",
+  "kingDamageSe", "kingDeathSe", "enemyDefeatSe", "heroAppearSe", "heroDefeatSe", "gameEndSe"
+];
+
 exports.main = function main(param) {
   const scene = new g.Scene({
     game: g.game,
     assetIds: [
-      "sprites", "field", "gameBgm", "itemPickupSe", "summonSe", "monsterDeathSe",
-      "kingDamageSe", "kingDeathSe", "enemyDefeatSe", "heroAppearSe", "heroDefeatSe", "gameEndSe"
+      "sprites", "field"
     ]
   });
   const random = param.random || g.game.random;
@@ -30,15 +34,50 @@ exports.main = function main(param) {
     const fieldImage = scene.asset.getImageById("field");
     const ATLAS_CELL = 256;
     const seCooldownUntil = {};
-    const gameBgmPlayer = scene.asset.getAudioById("gameBgm").play();
-    gameBgmPlayer.changeVolume(0.32);
+    let audioReady = false;
+    let audioLoading = false;
+    let audioLoadFailed = false;
+    let gameBgmPlayer = null;
+
+    function startGameBgm() {
+      if (!audioReady || gameBgmPlayer || ended) return;
+      gameBgmPlayer = scene.asset.getAudioById("gameBgm").play();
+      gameBgmPlayer.changeVolume(0.32);
+    }
+
+    function requestAudioAssets() {
+      if (audioReady || audioLoading || audioLoadFailed) return;
+      audioLoading = true;
+      scene.requestAssets({ assetIds: AUDIO_ASSET_IDS, notifyErrorOnCallback: true }, (error) => {
+        audioLoading = false;
+        if (error) {
+          audioLoadFailed = true;
+          return;
+        }
+        audioReady = true;
+        startGameBgm();
+      });
+    }
 
     function playSe(assetId, volume, cooldown) {
+      if (!audioReady) return;
       const now = g.game.age / g.game.fps;
       if (seCooldownUntil[assetId] && seCooldownUntil[assetId] > now) return;
       seCooldownUntil[assetId] = now + (cooldown || 0);
       const player = scene.asset.getAudioById(assetId).play();
       player.changeVolume(volume == null ? 0.7 : volume);
+    }
+
+    function setLabelText(label, text) {
+      if (label.text === text) return false;
+      label.text = text;
+      label.invalidate();
+      return true;
+    }
+
+    function setEntityVisible(entity, visible) {
+      if (visible && entity.hidden) entity.show();
+      else if (!visible && !entity.hidden) entity.hide();
     }
 
     function atlasSprite(col, row, x, y, width, height, touchable) {
@@ -359,8 +398,11 @@ exports.main = function main(param) {
     });
     const virtualPadEntities = [padBase, padHorizontal, padVertical, padKnob, padLabel, padInput];
     virtualPadEntities.forEach((entity) => root.append(entity));
+    let virtualPadVisible = false;
 
     function setVirtualPadVisible(visible) {
+      if (virtualPadVisible === visible) return;
+      virtualPadVisible = visible;
       virtualPadEntities.forEach((entity) => {
         if (visible) entity.show(); else entity.hide();
       });
@@ -369,8 +411,7 @@ exports.main = function main(param) {
 
     function releaseVirtualPad() {
       virtualPadActive = false;
-      virtualPadVector.x = 0;
-      virtualPadVector.y = 0;
+      Logic.resetVirtualPad(king, virtualPadVector);
       padKnob.x = PAD_X + PAD_CENTER - padKnob.width / 2;
       padKnob.y = PAD_Y + PAD_CENTER - padKnob.height / 2;
       padKnob.modified();
@@ -509,38 +550,52 @@ exports.main = function main(param) {
       previewLabel.invalidate();
     }
 
-    function refreshSummonGuidance() {
+    let summonGuidanceState = "";
+    let summonGuidancePulseStep = -1;
+    function refreshSummonGuidance(force) {
       const choosing = phase === "play" && selected.length > 0;
       const selectable = phase === "play" && !selected.length && remainingCost() > 0;
+      const padVisible = phase === "play" && !choosing && king.alive && !ended;
+      const state = choosing + "/" + selectable + "/" + padVisible;
+      const stateChanged = state !== summonGuidanceState;
+      const pulseStep = Math.floor(elapsed * 10);
+      const pulseChanged = pulseStep !== summonGuidancePulseStep;
+      if (!force && !stateChanged && (!(choosing || selectable) || !pulseChanged)) return;
+      summonGuidanceState = state;
+      summonGuidancePulseStep = pulseStep;
       const pulse = 0.5 + (Math.sin(elapsed * 7) + 1) * 0.2;
       inventoryGuideBorders.forEach((border) => {
-        if (selectable) border.show(); else border.hide();
-        border.opacity = pulse;
-        border.modified();
+        setEntityVisible(border, selectable);
+        if (selectable && border.opacity !== pulse) {
+          border.opacity = pulse;
+          border.modified();
+        }
       });
-      if (choosing) summonTargetTint.show(); else summonTargetTint.hide();
-      summonTargetTint.opacity = 0.045 + pulse * 0.045;
-      summonTargetTint.modified();
-      summonFieldBorders.forEach((border) => {
-        if (choosing) border.show(); else border.hide();
-        border.opacity = pulse;
-        border.modified();
-      });
-      if (choosing) pauseBanner.show(); else pauseBanner.hide();
-      terrainViews.forEach((view) => {
-        view.rect.opacity = choosing ? 0.42 : 0.18;
-        view.label.opacity = choosing ? 1 : 0.86;
-        view.rect.modified();
-        view.label.modified();
-      });
-      setVirtualPadVisible(phase === "play" && !choosing && king.alive && !ended);
-      if (choosing) {
-        clearButton.show();
-        clearButtonLabel.show();
-      } else {
-        clearButton.hide();
-        clearButtonLabel.hide();
+      setEntityVisible(summonTargetTint, choosing);
+      const tintOpacity = 0.045 + pulse * 0.045;
+      if (choosing && summonTargetTint.opacity !== tintOpacity) {
+        summonTargetTint.opacity = tintOpacity;
+        summonTargetTint.modified();
       }
+      summonFieldBorders.forEach((border) => {
+        setEntityVisible(border, choosing);
+        if (choosing && border.opacity !== pulse) {
+          border.opacity = pulse;
+          border.modified();
+        }
+      });
+      setEntityVisible(pauseBanner, choosing);
+      if (stateChanged) {
+        terrainViews.forEach((view) => {
+          view.rect.opacity = choosing ? 0.42 : 0.18;
+          view.label.opacity = choosing ? 1 : 0.86;
+          view.rect.modified();
+          view.label.modified();
+        });
+      }
+      setVirtualPadVisible(padVisible);
+      setEntityVisible(clearButton, choosing);
+      setEntityVisible(clearButtonLabel, choosing);
     }
 
     function tacticName(id) {
@@ -555,28 +610,31 @@ exports.main = function main(param) {
 
     function refreshKingHp() {
       const hp = Math.max(0, Math.ceil(king.hp));
-      kingHpLabel.text = "魔王HP " + hp + "/" + king.maxHp;
-      kingHpLabel.invalidate();
-      kingHpBar.width = Math.max(0, 190 * king.hp / king.maxHp);
-      kingHpBar.cssColor = king.hp <= 30 ? "#ff3e5f" : king.hp <= 60 ? "#ee8a65" : "#e95780";
-      kingHpBar.modified();
+      setLabelText(kingHpLabel, "魔王HP " + hp + "/" + king.maxHp);
+      const width = Math.max(0, 190 * king.hp / king.maxHp);
+      const color = king.hp <= 30 ? "#ff3e5f" : king.hp <= 60 ? "#ee8a65" : "#e95780";
+      if (kingHpBar.width !== width || kingHpBar.cssColor !== color) {
+        kingHpBar.width = width;
+        kingHpBar.cssColor = color;
+        kingHpBar.modified();
+      }
     }
 
     function refreshForcePanels() {
-      enemyTitle.text = "敵勢力 " + enemies.length;
-      enemyTitle.invalidate();
+      setLabelText(enemyTitle, "敵勢力 " + enemies.length);
       const enemyCounts = {};
       enemies.forEach((enemy) => { enemyCounts[enemy.name] = (enemyCounts[enemy.name] || 0) + 1; });
       const enemyParts = Object.keys(enemyCounts).map((name) => name + "×" + enemyCounts[name]);
-      enemyPanel.height = 48 + Math.ceil(enemyParts.length / 2) * 21;
-      enemyPanel.modified();
+      const enemyPanelHeight = 48 + Math.ceil(enemyParts.length / 2) * 21;
+      if (enemyPanel.height !== enemyPanelHeight) {
+        enemyPanel.height = enemyPanelHeight;
+        enemyPanel.modified();
+      }
       enemyRows.forEach((row, index) => {
-        row.text = enemyParts.slice(index * 2, index * 2 + 2).join("　");
-        row.invalidate();
+        setLabelText(row, enemyParts.slice(index * 2, index * 2 + 2).join("　"));
       });
 
-      allyTitle.text = "味方勢力 " + minions.length + "体 / コスト" + currentCost() + "/" + currentCostLimit();
-      allyTitle.invalidate();
+      setLabelText(allyTitle, "味方勢力 " + minions.length + "体 / コスト" + currentCost() + "/" + currentCostLimit());
       const groups = {};
       minions.forEach((minion) => {
         const key = minion.name + "/" + minion.primary + "/" + minion.tactic;
@@ -588,19 +646,21 @@ exports.main = function main(param) {
       });
       const allyGroups = Object.keys(groups).map((key) => groups[key]);
       const visibleAllyRows = Math.min(7, allyGroups.length > 6 ? 7 : allyGroups.length);
-      allyPanel.height = 48 + visibleAllyRows * 21;
-      allyPanel.modified();
+      const allyPanelHeight = 48 + visibleAllyRows * 21;
+      if (allyPanel.height !== allyPanelHeight) {
+        allyPanel.height = allyPanelHeight;
+        allyPanel.modified();
+      }
       allyRows.forEach((row, index) => {
+        let text = "";
         if (index < 6 && allyGroups[index]) {
           const group = allyGroups[index];
           const countText = group.count > 1 ? "×" + group.count : "";
-          row.text = group.name.slice(0, 11) + countText + " T" + (group.tier + 1) + " HP" + Math.ceil(group.hp) + "/" + group.maxHp + "  " + speciesName(group.primary) + "/" + tacticName(group.tactic);
+          text = group.name.slice(0, 11) + countText + " T" + (group.tier + 1) + " HP" + Math.ceil(group.hp) + "/" + group.maxHp + "  " + speciesName(group.primary) + "/" + tacticName(group.tactic);
         } else if (index === 6 && allyGroups.length > 6) {
-          row.text = "ほか " + (allyGroups.length - 6) + "編成";
-        } else {
-          row.text = "";
+          text = "ほか " + (allyGroups.length - 6) + "編成";
         }
-        row.invalidate();
+        setLabelText(row, text);
       });
     }
 
@@ -664,7 +724,7 @@ exports.main = function main(param) {
       const body = atlasSprite(cell.col, cell.row, x - 20, y - 20, 40, 40, false);
       const label = new g.Label({ scene, x, y: y - 8, anchorX: 0.5, font: font12, text: "", textColor: "#18201e" });
       unitLayer.append(body); unitLayer.append(label);
-      drops.push({ x, y, id: cat.id, body, label, age: 0 });
+      drops.push({ x, y, id: cat.id, body, label, age: 0, visualStep: -1 });
     }
 
     function removeDrop(index, collectorName) {
@@ -726,13 +786,18 @@ exports.main = function main(param) {
 
     function nearest(origin, list, filter) {
       let best = null;
-      let bestD = Infinity;
+      let bestDistanceSquared = Infinity;
       list.forEach((item) => {
         if (filter && !filter(item)) return;
-        const d = Logic.distance(origin, item);
-        if (d < bestD) { best = item; bestD = d; }
+        const dx = origin.x - item.x;
+        const dy = origin.y - item.y;
+        const distanceSquared = dx * dx + dy * dy;
+        if (distanceSquared < bestDistanceSquared) {
+          best = item;
+          bestDistanceSquared = distanceSquared;
+        }
       });
-      return { target: best, distance: bestD };
+      return { target: best, distance: Math.sqrt(bestDistanceSquared) };
     }
 
     function moveToward(unit, target, speed, dt, stopRange) {
@@ -747,20 +812,34 @@ exports.main = function main(param) {
     }
 
     function syncEntity(unit) {
-      unit.body.x = unit.x - unit.body.width / 2;
-      unit.body.y = unit.y - unit.body.height / 2;
-      unit.body.modified();
-      unit.hpBg.x = unit.x - (unit.maxHp > 500 ? 28 : unit.body.width > 34 ? 20 : 18);
-      unit.hpBg.y = unit.y - unit.size - 7;
-      unit.hpBg.modified();
-      unit.hpBar.x = unit.hpBg.x;
-      unit.hpBar.y = unit.hpBg.y;
-      unit.hpBar.width = Math.max(0, unit.hpBg.width * unit.hp / unit.maxHp);
-      unit.hpBar.modified();
+      const bodyX = unit.x - unit.body.width / 2;
+      const bodyY = unit.y - unit.body.height / 2;
+      if (unit.body.x !== bodyX || unit.body.y !== bodyY) {
+        unit.body.x = bodyX;
+        unit.body.y = bodyY;
+        unit.body.modified();
+      }
+      const hpX = unit.x - (unit.maxHp > 500 ? 28 : unit.body.width > 34 ? 20 : 18);
+      const hpY = unit.y - unit.size - 7;
+      if (unit.hpBg.x !== hpX || unit.hpBg.y !== hpY) {
+        unit.hpBg.x = hpX;
+        unit.hpBg.y = hpY;
+        unit.hpBg.modified();
+      }
+      const hpWidth = Math.max(0, unit.hpBg.width * unit.hp / unit.maxHp);
+      if (unit.hpBar.x !== hpX || unit.hpBar.y !== hpY || unit.hpBar.width !== hpWidth) {
+        unit.hpBar.x = hpX;
+        unit.hpBar.y = hpY;
+        unit.hpBar.width = hpWidth;
+        unit.hpBar.modified();
+      }
       const textEntity = unit.label || unit.mark;
-      textEntity.x = unit.x;
-      textEntity.y = unit.y - 9;
-      textEntity.modified();
+      const textY = unit.y - 9;
+      if (textEntity.x !== unit.x || textEntity.y !== textY) {
+        textEntity.x = unit.x;
+        textEntity.y = textY;
+        textEntity.modified();
+      }
     }
 
     function destroyUnit(unit) {
@@ -952,8 +1031,12 @@ exports.main = function main(param) {
       for (let i = drops.length - 1; i >= 0; --i) {
         const d = drops[i];
         d.age += dt;
-        d.body.opacity = 0.72 + Math.sin(d.age * 5) * 0.22;
-        d.body.modified();
+        const visualStep = Math.floor(d.age * 10);
+        if (visualStep !== d.visualStep) {
+          d.visualStep = visualStep;
+          d.body.opacity = 0.72 + Math.sin(d.age * 5) * 0.22;
+          d.body.modified();
+        }
         if (king.alive && Logic.distance(d, king) < 35) removeDrop(i, "king");
       }
     }
@@ -964,6 +1047,11 @@ exports.main = function main(param) {
     }
 
     function floatingDamage(target, amount, color) {
+      let activeFloatingLabels = 0;
+      for (let i = 0; i < effects.length; ++i) {
+        if (effects[i].type === "floating") activeFloatingLabels += 1;
+      }
+      if (activeFloatingLabels >= 18) return;
       const label = new g.Label({
         scene, x: target.x, y: target.y - 30, anchorX: 0.5,
         font: font16, text: "-" + Math.max(1, Math.round(amount)), textColor: color || "#ffffff"
@@ -1065,7 +1153,8 @@ exports.main = function main(param) {
     }
 
     function burst(x, y, color, count) {
-      for (let i = 0; i < count; ++i) {
+      const particleCount = Math.min(count, Math.max(0, 80 - effects.length));
+      for (let i = 0; i < particleCount; ++i) {
         const angle = random.generate() * Math.PI * 2;
         const speed = 35 + random.generate() * 75;
         const body = new g.FilledRect({ scene, x: x - 3, y: y - 3, width: 6, height: 6, cssColor: color });
@@ -1110,7 +1199,10 @@ exports.main = function main(param) {
       if (ended) return;
       ended = true;
       phase = "end";
-      gameBgmPlayer.stop();
+      if (gameBgmPlayer) {
+        gameBgmPlayer.stop();
+        gameBgmPlayer = null;
+      }
       playSe("gameEndSe", 0.9);
       const noDeathBonus = deaths === 0 ? awardScore(3000) : 0;
       const overlay = new g.FilledRect({ scene, width: W, height: H, cssColor: "#07100e", opacity: 0.9 });
@@ -1166,6 +1258,8 @@ exports.main = function main(param) {
       hardButton.onPointDown.add(() => { difficultyId = "hard"; refreshDifficultySelection(); });
       function beginGame() {
         if (phase !== "ready") return;
+        requestAudioAssets();
+        startGameBgm();
         entities.forEach((entity) => entity.destroy());
         phase = "play";
         phaseLabel.text = difficulty.name + "　防衛開始";
@@ -1182,6 +1276,8 @@ exports.main = function main(param) {
     refreshKingHp();
     refreshForcePanels();
     updateSelectionPreview();
+    refreshSummonGuidance(true);
+    requestAudioAssets();
     for (let i = 0; i < 10; ++i) {
       spawnDrop(90 + random.generate() * (W - 180), TOP + 70 + random.generate() * (FIELD_BOTTOM - TOP - 130));
     }
@@ -1189,8 +1285,7 @@ exports.main = function main(param) {
     scene.onUpdate.add(() => {
       if (phase === "ready") {
         readyLeft -= DT;
-        readyUi.countdownLabel.text = "自動開始まで " + Math.max(1, Math.ceil(readyLeft));
-        readyUi.countdownLabel.invalidate();
+        setLabelText(readyUi.countdownLabel, "自動開始まで " + Math.max(1, Math.ceil(readyLeft)));
         if (readyLeft <= 0) readyUi.beginGame();
         return;
       }
@@ -1211,9 +1306,13 @@ exports.main = function main(param) {
         updateSelectionPreview();
       }
       const left = Math.max(0, GAME_TIME - elapsed);
-      timeLabel.text = String(Math.ceil(left));
-      timeLabel.textColor = left <= 20 ? "#ff718c" : "#ffffff";
-      timeLabel.invalidate();
+      const timeText = String(Math.ceil(left));
+      const timeColor = left <= 20 ? "#ff718c" : "#ffffff";
+      if (timeLabel.text !== timeText || timeLabel.textColor !== timeColor) {
+        timeLabel.text = timeText;
+        timeLabel.textColor = timeColor;
+        timeLabel.invalidate();
+      }
       let battlePaused = selected.length > 0;
       if (battlePaused) {
         summonPauseLeft -= DT;
@@ -1223,19 +1322,15 @@ exports.main = function main(param) {
           battlePaused = false;
         }
       }
-      if (battlePaused) pauseIndicator.show(); else pauseIndicator.hide();
-      pauseIndicator.text = battlePaused ? "② 召喚地点をタップ　戦術停止 " + summonPauseLeft.toFixed(1) : "";
-      pauseIndicator.invalidate();
-      phaseLabel.text = difficulty.name + "　" + (battlePaused ? "戦術停止" : phaseName() + "　魔軍×" + Logic.monsterTierBoost(monsterTier).toFixed(2));
-      phaseLabel.invalidate();
+      setEntityVisible(pauseIndicator, battlePaused);
+      setLabelText(pauseIndicator, battlePaused ? "② 召喚地点をタップ　戦術停止 " + summonPauseLeft.toFixed(1) : "");
+      setLabelText(phaseLabel, difficulty.name + "　" + (battlePaused ? "戦術停止" : phaseName() + "　魔軍×" + Logic.monsterTierBoost(monsterTier).toFixed(2)));
       refreshSummonGuidance();
-      statusLabel.text = "軍勢 " + currentCost() + "/" + costLimit + "  死亡 " + deaths;
-      statusLabel.invalidate();
+      setLabelText(statusLabel, "軍勢 " + currentCost() + "/" + costLimit + "  死亡 " + deaths);
 
       comboLeft -= DT;
       if (comboLeft <= 0) combo = 0;
-      comboLabel.text = combo >= 2 ? combo + " COMBO  ×" + (1 + Math.min(10, combo - 1) * 0.1).toFixed(1) : "";
-      comboLabel.invalidate();
+      setLabelText(comboLabel, combo >= 2 ? combo + " COMBO  ×" + (1 + Math.min(10, combo - 1) * 0.1).toFixed(1) : "");
       toastLeft -= DT;
       if (toastLeft <= 0 && !toastLabel.hidden) { toastLabel.hidden = true; toastLabel.modified(); }
 

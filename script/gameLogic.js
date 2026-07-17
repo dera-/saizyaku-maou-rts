@@ -50,6 +50,13 @@ function distance(a, b) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+function resetVirtualPad(king, vector) {
+  vector.x = 0;
+  vector.y = 0;
+  king.targetX = king.x;
+  king.targetY = king.y;
+}
+
 function enemyMultiplier(elapsed) {
   const t = clamp(elapsed / 180, 0, 1);
   return 1 + 1.15 * Math.pow(t, 1.55);
@@ -176,6 +183,7 @@ module.exports = {
   TERRAIN,
   clamp,
   distance,
+  resetVirtualPad,
   enemyMultiplier,
   enemySpawnInterval,
   enemyExtraSpawnChance,

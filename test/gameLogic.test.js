@@ -86,3 +86,12 @@ test("死亡ペナルティはノーマルとハードで共通かつ死亡回�
   assert.deepEqual(normal, [1500, 2000, 2500]);
   assert.deepEqual(hard, normal);
 });
+
+test("バーチャルパッドを離すと入力と古い移動目標が現在位置へリセットされる", () => {
+  const king = { x: 412, y: 358, targetX: 380, targetY: 340 };
+  const vector = { x: 0.75, y: -0.25 };
+  logic.resetVirtualPad(king, vector);
+  assert.deepEqual(vector, { x: 0, y: 0 });
+  assert.equal(king.targetX, king.x);
+  assert.equal(king.targetY, king.y);
+});
