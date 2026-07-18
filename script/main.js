@@ -76,8 +76,9 @@ exports.main = function main(param) {
     }
 
     function setEntityVisible(entity, visible) {
-      if (visible && entity.hidden) entity.show();
-      else if (!visible && !entity.hidden) entity.hide();
+      const currentlyVisible = entity.visible();
+      if (visible && !currentlyVisible) entity.show();
+      else if (!visible && currentlyVisible) entity.hide();
     }
 
     function atlasSprite(col, row, x, y, width, height, touchable) {
@@ -327,22 +328,24 @@ exports.main = function main(param) {
         summonPauseLeft = 5;
         updateSelectionPreview();
         refreshInventory();
+        refreshSummonGuidance(true);
       });
     });
 
     const MOBILE_CONTROL_SIZE = 104;
     const MOBILE_CONTROL_X = W - MOBILE_CONTROL_SIZE - 8;
     const MOBILE_CONTROL_Y = FIELD_BOTTOM + 10;
+    const clearButtonGroup = new g.E({ scene, hidden: true });
     const clearButton = new g.FilledRect({
       scene, x: MOBILE_CONTROL_X, y: MOBILE_CONTROL_Y + 22,
-      width: MOBILE_CONTROL_SIZE, height: 58, cssColor: "#704653", touchable: true, hidden: true
+      width: MOBILE_CONTROL_SIZE, height: 58, cssColor: "#704653", touchable: true
     });
     const clearButtonLabel = new g.Label({
       scene, x: MOBILE_CONTROL_X + MOBILE_CONTROL_SIZE / 2, y: MOBILE_CONTROL_Y + 40,
-      anchorX: 0.5, font: font16, text: "選択解除", textColor: "#ffffff", hidden: true
+      anchorX: 0.5, font: font16, text: "選択解除", textColor: "#ffffff"
     });
-    root.append(clearButton);
-    root.append(clearButtonLabel);
+    clearButtonGroup.append(clearButton);
+    clearButtonGroup.append(clearButtonLabel);
     clearButton.onPointDown.add(() => {
       cancelSummonSelection();
     });
@@ -398,6 +401,7 @@ exports.main = function main(param) {
     });
     const virtualPadEntities = [padBase, padHorizontal, padVertical, padKnob, padLabel, padInput];
     virtualPadEntities.forEach((entity) => root.append(entity));
+    root.append(clearButtonGroup);
     let virtualPadVisible = false;
 
     function setVirtualPadVisible(visible) {
@@ -491,6 +495,7 @@ exports.main = function main(param) {
       pauseIndicator.hide();
       refreshInventory();
       updateSelectionPreview();
+      refreshSummonGuidance(true);
     }
 
     function setScore(value) {
@@ -509,7 +514,7 @@ exports.main = function main(param) {
     function showToast(text, color) {
       toastLabel.text = text;
       toastLabel.textColor = color || "#fff0a5";
-      toastLabel.hidden = false;
+      setEntityVisible(toastLabel, true);
       toastLabel.invalidate();
       toastLabel.modified();
       toastLeft = 1.6;
@@ -594,8 +599,7 @@ exports.main = function main(param) {
         });
       }
       setVirtualPadVisible(padVisible);
-      setEntityVisible(clearButton, choosing);
-      setEntityVisible(clearButtonLabel, choosing);
+      setEntityVisible(clearButtonGroup, choosing);
     }
 
     function tacticName(id) {
@@ -697,6 +701,7 @@ exports.main = function main(param) {
       stopKingMovement();
       refreshInventory();
       updateSelectionPreview();
+      refreshSummonGuidance(true);
     }
 
     function empowerExistingMinions(nextTier) {
@@ -866,8 +871,7 @@ exports.main = function main(param) {
           king.hp = king.maxHp;
           king.invincible = 2;
           king.sinceDamage = 99;
-          kingBody.hidden = false; kingCrown.hidden = false;
-          kingBody.modified(); kingCrown.modified();
+          kingBody.show(); kingCrown.show();
           enemies.forEach((e) => {
             const d = Logic.distance(e, king);
             if (d < 170) moveToward(e, { x: e.x + (e.x - king.x) * 2, y: e.y + (e.y - king.y) * 2 }, 150, 0.9, 0);
@@ -908,8 +912,7 @@ exports.main = function main(param) {
       king.reviveLeft = 3;
       cancelSummonSelection();
       king.targetX = king.x; king.targetY = king.y;
-      kingBody.hidden = true; kingCrown.hidden = true;
-      kingBody.modified(); kingCrown.modified();
+      kingBody.hide(); kingCrown.hide();
       enemies.forEach(assignScatterTarget);
       refreshKingHp();
       playSe("kingDeathSe", 0.95);
@@ -1332,7 +1335,7 @@ exports.main = function main(param) {
       if (comboLeft <= 0) combo = 0;
       setLabelText(comboLabel, combo >= 2 ? combo + " COMBO  ×" + (1 + Math.min(10, combo - 1) * 0.1).toFixed(1) : "");
       toastLeft -= DT;
-      if (toastLeft <= 0 && !toastLabel.hidden) { toastLabel.hidden = true; toastLabel.modified(); }
+      if (toastLeft <= 0 && toastLabel.visible()) toastLabel.hide();
 
       if (!battlePaused) {
         spawnLeft -= DT;
