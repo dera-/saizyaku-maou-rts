@@ -200,14 +200,16 @@ exports.main = function main(param) {
     root.append(timeLabel);
     const phaseLabel = new g.Label({ scene, x: W / 2, y: 48, anchorX: 0.5, font: font12, text: "準備", textColor: "#8ee6c3" });
     root.append(phaseLabel);
-    const statusLabel = new g.Label({ scene, x: W - 18, y: 10, anchorX: 1, font: font16, text: "軍勢 0/6  死亡 0", textColor: "#d8e3df" });
+    const TOP_STATUS_SHIFT_X = 88;
+    const TOP_STATUS_RIGHT = W - 18 - TOP_STATUS_SHIFT_X;
+    const statusLabel = new g.Label({ scene, x: TOP_STATUS_RIGHT, y: 10, anchorX: 1, font: font16, text: "軍勢 0/6  死亡 0", textColor: "#d8e3df" });
     root.append(statusLabel);
     const comboLabel = new g.Label({ scene, x: W - 260, y: 35, anchorX: 1, font: font20, text: "", textColor: "#ffd064" });
     root.append(comboLabel);
-    const kingHpLabel = new g.Label({ scene, x: W - 18, y: 34, anchorX: 1, font: font16, text: "魔王HP 50/50", textColor: "#ffb2c9" });
+    const kingHpLabel = new g.Label({ scene, x: TOP_STATUS_RIGHT, y: 34, anchorX: 1, font: font16, text: "魔王HP 50/50", textColor: "#ffb2c9" });
     root.append(kingHpLabel);
-    const kingHpBg = new g.FilledRect({ scene, x: W - 370, y: 15, width: 190, height: 12, cssColor: "#3d2630" });
-    const kingHpBar = new g.FilledRect({ scene, x: W - 370, y: 15, width: 190, height: 12, cssColor: "#e95780" });
+    const kingHpBg = new g.FilledRect({ scene, x: W - 370 - TOP_STATUS_SHIFT_X, y: 15, width: 190, height: 12, cssColor: "#3d2630" });
+    const kingHpBar = new g.FilledRect({ scene, x: W - 370 - TOP_STATUS_SHIFT_X, y: 15, width: 190, height: 12, cssColor: "#e95780" });
     root.append(kingHpBg); root.append(kingHpBar);
 
     const inventoryPanel = new g.FilledRect({ scene, x: 0, y: FIELD_BOTTOM, width: W, height: H - FIELD_BOTTOM, cssColor: "#0b1513" });
