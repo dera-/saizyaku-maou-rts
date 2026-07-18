@@ -2,10 +2,11 @@
 
 const Logic = require("./gameLogic");
 
-const AUDIO_ASSET_IDS = [
-  "gameBgm", "itemPickupSe", "summonSe", "monsterDeathSe",
-  "kingDamageSe", "kingDeathSe", "enemyDefeatSe", "heroAppearSe", "heroDefeatSe", "gameEndSe"
-];
+const AUDIO_GROUPS = {
+  bgm: ["gameBgm"],
+  commonSe: ["itemPickupSe", "summonSe", "monsterDeathSe", "kingDamageSe", "kingDeathSe", "enemyDefeatSe"],
+  lateSe: ["heroAppearSe", "heroDefeatSe", "gameEndSe"]
+};
 
 exports.main = function main(param) {
   const scene = new g.Scene({
@@ -23,44 +24,49 @@ exports.main = function main(param) {
     const TOP = 66;
     const FIELD_BOTTOM = 596;
     const GAME_TIME = 180;
+    const MAX_ENEMIES = 42;
+    const MAX_PROJECTILES = 36;
+    const MAX_EFFECTS = 56;
+    const MAX_FLOATING_LABELS = 8;
+    const CROWDED_UNIT_THRESHOLD = 28;
     const FINAL_COST_LIMIT = Logic.costLimit(GAME_TIME);
     const DT = 1 / g.game.fps;
-    const font12 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 12 });
-    const font16 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 16 });
-    const font20 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 20 });
-    const font28 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 28, fontWeight: "bold" });
-    const font42 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 42, fontWeight: "bold" });
+    const font12 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 15 });
+    const font16 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 20 });
+    const font20 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 24 });
+    const font28 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 32, fontWeight: "bold" });
+    const font42 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 44, fontWeight: "bold" });
     const spriteAtlas = scene.asset.getImageById("sprites");
     const fieldImage = scene.asset.getImageById("field");
     const ATLAS_CELL = 256;
     const seCooldownUntil = {};
-    let audioReady = false;
-    let audioLoading = false;
-    let audioLoadFailed = false;
+    const loadedAudioIds = {};
+    const audioGroupStates = { bgm: "idle", commonSe: "idle", lateSe: "idle" };
     let gameBgmPlayer = null;
 
     function startGameBgm() {
-      if (!audioReady || gameBgmPlayer || ended) return;
+      if (!loadedAudioIds.gameBgm || gameBgmPlayer || ended) return;
       gameBgmPlayer = scene.asset.getAudioById("gameBgm").play();
       gameBgmPlayer.changeVolume(0.32);
     }
 
-    function requestAudioAssets() {
-      if (audioReady || audioLoading || audioLoadFailed) return;
-      audioLoading = true;
-      scene.requestAssets({ assetIds: AUDIO_ASSET_IDS, notifyErrorOnCallback: true }, (error) => {
-        audioLoading = false;
+    function requestAudioGroup(groupName) {
+      if (audioGroupStates[groupName] !== "idle") return;
+      const assetIds = AUDIO_GROUPS[groupName];
+      audioGroupStates[groupName] = "loading";
+      scene.requestAssets({ assetIds, notifyErrorOnCallback: true }, (error) => {
         if (error) {
-          audioLoadFailed = true;
+          audioGroupStates[groupName] = "failed";
           return;
         }
-        audioReady = true;
-        startGameBgm();
+        audioGroupStates[groupName] = "ready";
+        assetIds.forEach((assetId) => { loadedAudioIds[assetId] = true; });
+        if (groupName === "bgm") startGameBgm();
       });
     }
 
     function playSe(assetId, volume, cooldown) {
-      if (!audioReady) return;
+      if (!loadedAudioIds[assetId]) return;
       const now = g.game.age / g.game.fps;
       if (seCooldownUntil[assetId] && seCooldownUntil[assetId] > now) return;
       seCooldownUntil[assetId] = now + (cooldown || 0);
@@ -211,6 +217,15 @@ exports.main = function main(param) {
     const kingHpBg = new g.FilledRect({ scene, x: W - 370 - TOP_STATUS_SHIFT_X, y: 15, width: 190, height: 12, cssColor: "#3d2630" });
     const kingHpBar = new g.FilledRect({ scene, x: W - 370 - TOP_STATUS_SHIFT_X, y: 15, width: 190, height: 12, cssColor: "#e95780" });
     root.append(kingHpBg); root.append(kingHpBar);
+    const ruleHintBg = new g.FilledRect({
+      scene, x: W / 2 - 315, y: TOP + 5, width: 630, height: 32,
+      cssColor: "#10231e", opacity: 0.82
+    });
+    const ruleHintLabel = new g.Label({
+      scene, x: W / 2, y: TOP + 10, anchorX: 0.5, font: font16,
+      text: "触媒を拾う → 画面下で選ぶ → 戦場タップで召喚", textColor: "#fff0a5"
+    });
+    root.append(ruleHintBg); root.append(ruleHintLabel);
 
     const inventoryPanel = new g.FilledRect({ scene, x: 0, y: FIELD_BOTTOM, width: W, height: H - FIELD_BOTTOM, cssColor: "#0b1513" });
     root.append(inventoryPanel);
@@ -235,6 +250,7 @@ exports.main = function main(param) {
     let appliedMonsterTier = 0;
     let knownCostLimit = Logic.costLimit(0);
     let summonSerial = 0;
+    let simulationFrame = 0;
     const minions = [];
     const enemies = [];
     const drops = [];
@@ -287,20 +303,20 @@ exports.main = function main(param) {
     });
     root.append(pauseIndicator);
 
-    const enemyPanel = new g.FilledRect({ scene, x: 10, y: TOP + 38, width: 290, height: 48, cssColor: "#1a2024", opacity: 0.64 });
-    const allyPanel = new g.FilledRect({ scene, x: W - 410, y: TOP + 38, width: 400, height: 48, cssColor: "#17241f", opacity: 0.68 });
+    const enemyPanel = new g.FilledRect({ scene, x: 10, y: TOP + 38, width: 330, height: 48, cssColor: "#1a2024", opacity: 0.64 });
+    const allyPanel = new g.FilledRect({ scene, x: W - 510, y: TOP + 38, width: 500, height: 48, cssColor: "#17241f", opacity: 0.68 });
     root.append(enemyPanel); root.append(allyPanel);
     const enemyTitle = new g.Label({ scene, x: 20, y: TOP + 45, font: font16, text: "敵勢力 0", textColor: "#ffb0a4" });
-    const allyTitle = new g.Label({ scene, x: W - 400, y: TOP + 45, font: font16, text: "味方勢力 0/6", textColor: "#9cf0ba" });
+    const allyTitle = new g.Label({ scene, x: W - 500, y: TOP + 45, font: font16, text: "味方勢力 0/6", textColor: "#9cf0ba" });
     root.append(enemyTitle); root.append(allyTitle);
     const enemyRows = [];
     const allyRows = [];
     for (let i = 0; i < 4; ++i) {
-      const label = new g.Label({ scene, x: 20, y: TOP + 70 + i * 21, width: 270, font: font12, text: "", textColor: "#e4d8d4" });
+      const label = new g.Label({ scene, x: 20, y: TOP + 72 + i * 22, width: 310, font: font12, text: "", textColor: "#e4d8d4" });
       enemyRows.push(label); root.append(label);
     }
     for (let i = 0; i < 7; ++i) {
-      const label = new g.Label({ scene, x: W - 400, y: TOP + 70 + i * 21, width: 382, font: font12, text: "", textColor: "#d8eee0" });
+      const label = new g.Label({ scene, x: W - 500, y: TOP + 72 + i * 22, width: 482, font: font12, text: "", textColor: "#d8eee0" });
       allyRows.push(label); root.append(label);
     }
 
@@ -631,7 +647,7 @@ exports.main = function main(param) {
       const enemyCounts = {};
       enemies.forEach((enemy) => { enemyCounts[enemy.name] = (enemyCounts[enemy.name] || 0) + 1; });
       const enemyParts = Object.keys(enemyCounts).map((name) => name + "×" + enemyCounts[name]);
-      const enemyPanelHeight = 48 + Math.ceil(enemyParts.length / 2) * 21;
+      const enemyPanelHeight = 50 + Math.ceil(enemyParts.length / 2) * 22;
       if (enemyPanel.height !== enemyPanelHeight) {
         enemyPanel.height = enemyPanelHeight;
         enemyPanel.modified();
@@ -652,7 +668,7 @@ exports.main = function main(param) {
       });
       const allyGroups = Object.keys(groups).map((key) => groups[key]);
       const visibleAllyRows = Math.min(7, allyGroups.length > 6 ? 7 : allyGroups.length);
-      const allyPanelHeight = 48 + visibleAllyRows * 21;
+      const allyPanelHeight = 50 + visibleAllyRows * 22;
       if (allyPanel.height !== allyPanelHeight) {
         allyPanel.height = allyPanelHeight;
         allyPanel.modified();
@@ -689,10 +705,9 @@ exports.main = function main(param) {
       const body = atlasSprite(cell.col, cell.row, x - visualSize / 2, y - visualSize / 2, visualSize, visualSize, false);
       const hpBg = new g.FilledRect({ scene, x: x - 18, y: y - spec.size - 7, width: 36, height: 4, cssColor: "#251f21" });
       const hpBar = new g.FilledRect({ scene, x: x - 18, y: y - spec.size - 7, width: 36, height: 4, cssColor: "#6be08c" });
-      const mark = new g.Label({ scene, x, y: y - 9, anchorX: 0.5, font: font12, text: "", textColor: "#17201e" });
-      unitLayer.append(body); unitLayer.append(hpBg); unitLayer.append(hpBar); unitLayer.append(mark);
+      unitLayer.append(body); unitLayer.append(hpBg); unitLayer.append(hpBar);
       minions.push({
-        ...spec, x, y, hp: spec.hp, maxHp: spec.hp, body, hpBg, hpBar, mark,
+        ...spec, x, y, hp: spec.hp, maxHp: spec.hp, body, hpBg, hpBar,
         attackLeft: random.generate() * 0.4, age: 0, poisonTick: 0, id: summonSerial
       });
       playSe("summonSe", 0.72, 0.1);
@@ -729,15 +744,14 @@ exports.main = function main(param) {
       const cat = forcedId ? Logic.CATALYSTS.find((c) => c.id === forcedId) : Logic.CATALYSTS[Math.floor(random.generate() * Logic.CATALYSTS.length)];
       const cell = catalystCell(cat.id);
       const body = atlasSprite(cell.col, cell.row, x - 20, y - 20, 40, 40, false);
-      const label = new g.Label({ scene, x, y: y - 8, anchorX: 0.5, font: font12, text: "", textColor: "#18201e" });
-      unitLayer.append(body); unitLayer.append(label);
-      drops.push({ x, y, id: cat.id, body, label, age: 0, visualStep: -1 });
+      unitLayer.append(body);
+      drops.push({ x, y, id: cat.id, body, age: 0, visualStep: -1 });
     }
 
     function removeDrop(index, collectorName) {
       const drop = drops[index];
       inventory[drop.id] = Math.min(9, inventory[drop.id] + 1);
-      drop.body.destroy(); drop.label.destroy();
+      drop.body.destroy();
       drops.splice(index, 1);
       playSe("itemPickupSe", collectorName === "king" ? 0.62 : 0.48, 0.08);
       refreshInventory();
@@ -763,6 +777,7 @@ exports.main = function main(param) {
     }
 
     function spawnEnemy(typeId) {
+      if (typeId !== "hero" && enemies.length >= MAX_ENEMIES) return false;
       const base = ENEMY_TYPES[typeId];
       const gate = gates[Math.floor(random.generate() * gates.length)];
       const mult = typeId === "hero" ? 1 : Logic.enemyMultiplier(elapsed);
@@ -774,14 +789,13 @@ exports.main = function main(param) {
       const body = atlasSprite(cell.col, cell.row, x - visualSize / 2, y - visualSize / 2, visualSize, visualSize, false);
       const hpBg = new g.FilledRect({ scene, x: x - 20, y: y - base.size - 7, width: 40, height: 4, cssColor: "#251f21" });
       const hpBar = new g.FilledRect({ scene, x: x - 20, y: y - base.size - 7, width: 40, height: 4, cssColor: typeId === "hero" ? "#ffd34e" : "#e46c6c" });
-      const label = new g.Label({ scene, x, y: y - 9, anchorX: 0.5, font: font12, text: "", textColor: "#1b201e" });
-      unitLayer.append(body); unitLayer.append(hpBg); unitLayer.append(hpBar); unitLayer.append(label);
+      unitLayer.append(body); unitLayer.append(hpBg); unitLayer.append(hpBar);
       enemies.push({
         ...base, typeId, x, y, hp, maxHp: hp,
         attack: base.attack * mult * difficulty.enemyAttack,
         speed: base.speed * difficulty.enemySpeed,
         cooldown: base.cooldown * difficulty.enemyCooldown,
-        body, hpBg, hpBar, label,
+        body, hpBg, hpBar,
         attackLeft: random.generate() * 0.5, poisonLeft: 0, poisonTick: 0, scatterTarget: null
       });
       if (!king.alive) assignScatterTarget(enemies[enemies.length - 1]);
@@ -789,6 +803,7 @@ exports.main = function main(param) {
         playSe("heroAppearSe", 0.9);
         showToast("勇者襲来！ 魔王を最優先で狙っています", "#ffd34e");
       }
+      return true;
     }
 
     function nearest(origin, list, filter) {
@@ -840,18 +855,10 @@ exports.main = function main(param) {
         unit.hpBar.width = hpWidth;
         unit.hpBar.modified();
       }
-      const textEntity = unit.label || unit.mark;
-      const textY = unit.y - 9;
-      if (textEntity.x !== unit.x || textEntity.y !== textY) {
-        textEntity.x = unit.x;
-        textEntity.y = textY;
-        textEntity.modified();
-      }
     }
 
     function destroyUnit(unit) {
       unit.body.destroy(); unit.hpBg.destroy(); unit.hpBar.destroy();
-      (unit.label || unit.mark).destroy();
     }
 
     function assignScatterTarget(enemy) {
@@ -1036,7 +1043,7 @@ exports.main = function main(param) {
       for (let i = drops.length - 1; i >= 0; --i) {
         const d = drops[i];
         d.age += dt;
-        const visualStep = Math.floor(d.age * 10);
+        const visualStep = Math.floor(d.age * 5);
         if (visualStep !== d.visualStep) {
           d.visualStep = visualStep;
           d.body.opacity = 0.72 + Math.sin(d.age * 5) * 0.22;
@@ -1056,7 +1063,7 @@ exports.main = function main(param) {
       for (let i = 0; i < effects.length; ++i) {
         if (effects[i].type === "floating") activeFloatingLabels += 1;
       }
-      if (activeFloatingLabels >= 18) return;
+      if (activeFloatingLabels >= MAX_FLOATING_LABELS || effects.length >= MAX_EFFECTS) return;
       const label = new g.Label({
         scene, x: target.x, y: target.y - 30, anchorX: 0.5,
         font: font16, text: "-" + Math.max(1, Math.round(amount)), textColor: color || "#ffffff"
@@ -1092,6 +1099,7 @@ exports.main = function main(param) {
     }
 
     function meleeTrace(attacker, target, color) {
+      if (effects.length >= MAX_EFFECTS) return;
       const dx = target.x - attacker.x;
       const dy = target.y - attacker.y;
       const length = Math.max(16, Math.sqrt(dx * dx + dy * dy));
@@ -1108,6 +1116,11 @@ exports.main = function main(param) {
       if (!target || !isTargetValid(target)) return;
       const color = attacker.color || "#ffffff";
       if (attacker.range >= 80) {
+        if (projectiles.length >= MAX_PROJECTILES) {
+          meleeTrace(attacker, target, color);
+          applyDamage(target, damage, color, poison);
+          return;
+        }
         const body = new g.FilledRect({
           scene, x: attacker.x, y: attacker.y, width: 12, height: 6,
           anchorX: 0.5, anchorY: 0.5, cssColor: color
@@ -1152,13 +1165,14 @@ exports.main = function main(param) {
     }
 
     function hitFlash(unit, color) {
+      if (effects.length >= MAX_EFFECTS) return;
       unit.body.cssColor = "#ffffff";
       unit.body.modified();
       effects.push({ type: "flash", unit, color, left: 0.08 });
     }
 
     function burst(x, y, color, count) {
-      const particleCount = Math.min(count, Math.max(0, 80 - effects.length));
+      const particleCount = Math.min(count, Math.max(0, MAX_EFFECTS - effects.length));
       for (let i = 0; i < particleCount; ++i) {
         const angle = random.generate() * Math.PI * 2;
         const speed = 35 + random.generate() * 75;
@@ -1221,28 +1235,31 @@ exports.main = function main(param) {
 
     function showReadyOverlay() {
       const overlay = new g.FilledRect({ scene, width: W, height: H, cssColor: "#07100e", opacity: 0.88 });
-      const panel = new g.FilledRect({ scene, x: 170, y: 70, width: 940, height: 570, cssColor: "#172923" });
-      const readyTitle = new g.Label({ scene, x: W / 2, y: 94, anchorX: 0.5, font: font42, text: "触媒モンスター ~最弱魔王の防衛戦~", textColor: "#f3d78b" });
+      const panel = new g.FilledRect({ scene, x: 150, y: 54, width: 980, height: 606, cssColor: "#172923" });
+      const readyTitle = new g.Label({ scene, x: W / 2, y: 76, anchorX: 0.5, font: font42, text: "触媒モンスター ~最弱魔王の防衛戦~", textColor: "#f3d78b" });
       const lines = [
-        "魔王をドラッグ／右下のパッドで移動し、触媒を集める",
-        "画面下の触媒を1～3個タップして選ぶ",
-        "光った戦場をタップしてモンスターを召喚する"
+        "パッドで魔王を動かし、フィールドの触媒を拾う",
+        "画面下の触媒を1～3個選ぶ（選択中は戦闘停止）",
+        "光った戦場をタップしてモンスターを召喚",
+        "モンスターは自動戦闘。魔王は倒されても3秒後に復活"
       ];
       const entities = [overlay, panel, readyTitle];
       entities.forEach((entity) => root.append(entity));
-      const operationTitle = new g.Label({ scene, x: 230, y: 165, font: font20, text: "操作方法", textColor: "#8ee6c3" });
-      const lineLabels = lines.map((line, i) => new g.Label({ scene, x: 245, y: 205 + i * 40, font: font20, text: (i + 1) + ". " + line, textColor: "#e7efec" }));
-      const difficultyTitle = new g.Label({ scene, x: 230, y: 340, font: font20, text: "難易度を選択（デフォルト：ノーマル）", textColor: "#8ee6c3" });
-      const normalButton = new g.FilledRect({ scene, x: 245, y: 380, width: 370, height: 78, cssColor: "#315b4b", touchable: true });
-      const hardButton = new g.FilledRect({ scene, x: 665, y: 380, width: 370, height: 78, cssColor: "#242d2a", touchable: true });
-      const normalLabel = new g.Label({ scene, x: 430, y: 390, anchorX: 0.5, font: font20, text: "● ノーマル（選択中）", textColor: "#ffffff" });
-      const normalDetail = new g.Label({ scene, x: 430, y: 425, anchorX: 0.5, font: font12, text: "現在の標準難易度・HP自然回復あり", textColor: "#d5e5df" });
-      const hardLabel = new g.Label({ scene, x: 850, y: 390, anchorX: 0.5, font: font20, text: "ハード", textColor: "#d4ddd9" });
-      const hardDetail = new g.Label({ scene, x: 850, y: 425, anchorX: 0.5, font: font12, text: "自然回復なし・敵強化・獲得スコア5倍", textColor: "#f2b4a8" });
-      const startButton = new g.FilledRect({ scene, x: 440, y: 488, width: 400, height: 72, cssColor: "#a45b35", touchable: true });
-      const startLabel = new g.Label({ scene, x: W / 2, y: 506, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
-      const countdownLabel = new g.Label({ scene, x: W / 2, y: 585, anchorX: 0.5, font: font20, text: "自動開始まで 10", textColor: "#f3d78b" });
-      entities.push(operationTitle, ...lineLabels, difficultyTitle, normalButton, hardButton, normalLabel, normalDetail, hardLabel, hardDetail, startButton, startLabel, countdownLabel);
+      const goalLabel = new g.Label({ scene, x: W / 2, y: 137, anchorX: 0.5, font: font20, text: "目的：180秒生き延び、敵を倒してハイスコアを目指せ！", textColor: "#ffe08a" });
+      const operationTitle = new g.Label({ scene, x: 210, y: 180, font: font20, text: "遊び方", textColor: "#8ee6c3" });
+      const lineLabels = lines.map((line, i) => new g.Label({ scene, x: 225, y: 216 + i * 30, font: font16, text: (i + 1) + ". " + line, textColor: "#e7efec" }));
+      const scoreRuleLabel = new g.Label({ scene, x: W / 2, y: 339, anchorX: 0.5, font: font16, text: "敵撃破で得点／魔王死亡で減点　ハードは獲得スコア5倍", textColor: "#f0c6aa" });
+      const difficultyTitle = new g.Label({ scene, x: 210, y: 372, font: font20, text: "難易度を選択（デフォルト：ノーマル）", textColor: "#8ee6c3" });
+      const normalButton = new g.FilledRect({ scene, x: 225, y: 407, width: 390, height: 70, cssColor: "#315b4b", touchable: true });
+      const hardButton = new g.FilledRect({ scene, x: 665, y: 407, width: 390, height: 70, cssColor: "#242d2a", touchable: true });
+      const normalLabel = new g.Label({ scene, x: 420, y: 414, anchorX: 0.5, font: font20, text: "● ノーマル（選択中）", textColor: "#ffffff" });
+      const normalDetail = new g.Label({ scene, x: 420, y: 449, anchorX: 0.5, font: font12, text: "標準難易度・HP自然回復あり", textColor: "#d5e5df" });
+      const hardLabel = new g.Label({ scene, x: 860, y: 414, anchorX: 0.5, font: font20, text: "ハード", textColor: "#d4ddd9" });
+      const hardDetail = new g.Label({ scene, x: 860, y: 449, anchorX: 0.5, font: font12, text: "自然回復なし・敵強化・スコア5倍", textColor: "#f2b4a8" });
+      const startButton = new g.FilledRect({ scene, x: 440, y: 498, width: 400, height: 68, cssColor: "#a45b35", touchable: true });
+      const startLabel = new g.Label({ scene, x: W / 2, y: 510, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
+      const countdownLabel = new g.Label({ scene, x: W / 2, y: 588, anchorX: 0.5, font: font20, text: "自動開始まで 10", textColor: "#f3d78b" });
+      entities.push(goalLabel, operationTitle, ...lineLabels, scoreRuleLabel, difficultyTitle, normalButton, hardButton, normalLabel, normalDetail, hardLabel, hardDetail, startButton, startLabel, countdownLabel);
       entities.slice(3).forEach((entity) => root.append(entity));
 
       function refreshDifficultySelection() {
@@ -1263,7 +1280,7 @@ exports.main = function main(param) {
       hardButton.onPointDown.add(() => { difficultyId = "hard"; refreshDifficultySelection(); });
       function beginGame() {
         if (phase !== "ready") return;
-        requestAudioAssets();
+        requestAudioGroup("bgm");
         startGameBgm();
         entities.forEach((entity) => entity.destroy());
         phase = "play";
@@ -1282,7 +1299,7 @@ exports.main = function main(param) {
     refreshForcePanels();
     updateSelectionPreview();
     refreshSummonGuidance(true);
-    requestAudioAssets();
+    requestAudioGroup("bgm");
     for (let i = 0; i < 10; ++i) {
       spawnDrop(90 + random.generate() * (W - 180), TOP + 70 + random.generate() * (FIELD_BOTTOM - TOP - 130));
     }
@@ -1297,6 +1314,11 @@ exports.main = function main(param) {
       if (ended) { updateEffects(DT); return; }
 
       elapsed += DT;
+      const showRuleHint = elapsed < 18;
+      setEntityVisible(ruleHintBg, showRuleHint);
+      setEntityVisible(ruleHintLabel, showRuleHint);
+      if (elapsed >= 1 && audioGroupStates.bgm !== "loading") requestAudioGroup("commonSe");
+      if (elapsed >= 12 && audioGroupStates.commonSe !== "loading") requestAudioGroup("lateSe");
       const monsterTier = Logic.corruptionTier(elapsed);
       if (monsterTier > appliedMonsterTier) {
         appliedMonsterTier = monsterTier;
@@ -1328,7 +1350,8 @@ exports.main = function main(param) {
         }
       }
       setEntityVisible(pauseIndicator, battlePaused);
-      setLabelText(pauseIndicator, battlePaused ? "② 召喚地点をタップ　戦術停止 " + summonPauseLeft.toFixed(1) : "");
+        const pauseDisplay = Math.max(0, Math.ceil(summonPauseLeft * 5) / 5).toFixed(1);
+        setLabelText(pauseIndicator, battlePaused ? "② 召喚地点をタップ　戦術停止 " + pauseDisplay : "");
       setLabelText(phaseLabel, difficulty.name + "　" + (battlePaused ? "戦術停止" : phaseName() + "　魔軍×" + Logic.monsterTierBoost(monsterTier).toFixed(2)));
       refreshSummonGuidance();
       setLabelText(statusLabel, "軍勢 " + currentCost() + "/" + costLimit + "  死亡 " + deaths);
@@ -1355,15 +1378,20 @@ exports.main = function main(param) {
         }
 
         updateKing(DT);
-        updateMinions(DT);
         updateProjectiles(DT);
-        updateEnemies(DT);
-        updateDrops(DT);
+        simulationFrame += 1;
+        const crowded = minions.length + enemies.length >= CROWDED_UNIT_THRESHOLD;
+        if (!crowded || simulationFrame % 2 === 0) {
+          const unitDt = crowded ? DT * 2 : DT;
+          updateMinions(unitDt);
+          updateEnemies(unitDt);
+          updateDrops(unitDt);
+        }
       }
       updateEffects(DT);
       forceUiLeft -= DT;
       if (forceUiLeft <= 0) {
-        forceUiLeft = 0.2;
+        forceUiLeft = 0.35;
         refreshForcePanels();
         refreshKingHp();
       }
