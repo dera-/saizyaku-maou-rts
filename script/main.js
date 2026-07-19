@@ -2,11 +2,17 @@
 
 const Logic = require("./gameLogic");
 
-const AUDIO_GROUPS = {
-  bgm: ["gameBgm"],
-  commonSe: ["itemPickupSe", "summonSe", "monsterDeathSe", "kingDamageSe", "kingDeathSe", "enemyDefeatSe"],
-  lateSe: ["heroAppearSe", "heroDefeatSe", "gameEndSe"]
-};
+const AUDIO_LOAD_PLAN = [
+  { id: "itemPickupSe", after: 1 },
+  { id: "summonSe", after: 3 },
+  { id: "kingDamageSe", after: 5 },
+  { id: "enemyDefeatSe", after: 7 },
+  { id: "monsterDeathSe", after: 9 },
+  { id: "kingDeathSe", after: 11 },
+  { id: "heroAppearSe", after: 100 },
+  { id: "heroDefeatSe", after: 135 },
+  { id: "gameEndSe", after: 150 }
+];
 
 exports.main = function main(param) {
   const scene = new g.Scene({
@@ -25,9 +31,9 @@ exports.main = function main(param) {
     const FIELD_BOTTOM = 596;
     const GAME_TIME = 180;
     const MAX_ENEMIES = 42;
-    const MAX_PROJECTILES = 36;
-    const MAX_EFFECTS = 56;
-    const MAX_FLOATING_LABELS = 8;
+    const MAX_PROJECTILES = 32;
+    const MAX_EFFECTS = 44;
+    const MAX_FLOATING_LABELS = 6;
     const CROWDED_UNIT_THRESHOLD = 28;
     const FINAL_COST_LIMIT = Logic.costLimit(GAME_TIME);
     const DT = 1 / g.game.fps;
@@ -41,9 +47,12 @@ exports.main = function main(param) {
     const ATLAS_CELL = 256;
     const seCooldownUntil = {};
     const loadedAudioIds = {};
-    const audioGroupStates = { bgm: "idle", commonSe: "idle", lateSe: "idle" };
+    const audioAssetStates = {};
     let gameBgmPlayer = null;
     let audioInteractionReady = false;
+    let audioRequestBusy = false;
+    let nextAudioRequestAt = 0;
+    let audioLoadPlanIndex = 0;
 
     function startGameBgm() {
       if (!audioInteractionReady || !loadedAudioIds.gameBgm || gameBgmPlayer || ended) return;
@@ -58,24 +67,36 @@ exports.main = function main(param) {
       }
     }
 
-    function requestAudioGroup(groupName) {
-      if (audioGroupStates[groupName] !== "idle") return;
-      const assetIds = AUDIO_GROUPS[groupName];
-      audioGroupStates[groupName] = "loading";
+    function requestAudioAsset(assetId) {
+      if (audioRequestBusy || loadedAudioIds[assetId] || audioAssetStates[assetId] === "loading") return;
+      audioAssetStates[assetId] = "loading";
+      audioRequestBusy = true;
       try {
-        scene.requestAssets({ assetIds, notifyErrorOnCallback: true }, (error) => {
+        scene.requestAssets({ assetIds: [assetId], notifyErrorOnCallback: true }, (error) => {
+          audioRequestBusy = false;
+          nextAudioRequestAt = elapsed + 0.9;
           if (error) {
-            audioGroupStates[groupName] = "failed";
+            audioAssetStates[assetId] = "failed";
             return;
           }
-          audioGroupStates[groupName] = "ready";
-          assetIds.forEach((assetId) => { loadedAudioIds[assetId] = true; });
-          if (groupName === "bgm") startGameBgm();
+          audioAssetStates[assetId] = "ready";
+          loadedAudioIds[assetId] = true;
+          if (assetId === "gameBgm") startGameBgm();
         });
       } catch (_error) {
         void _error;
-        audioGroupStates[groupName] = "failed";
+        audioRequestBusy = false;
+        nextAudioRequestAt = elapsed + 0.9;
+        audioAssetStates[assetId] = "failed";
       }
+    }
+
+    function pumpAudioLoading() {
+      if (!audioInteractionReady || audioRequestBusy || elapsed < nextAudioRequestAt || audioLoadPlanIndex >= AUDIO_LOAD_PLAN.length) return;
+      const next = AUDIO_LOAD_PLAN[audioLoadPlanIndex];
+      if (elapsed < next.after) return;
+      audioLoadPlanIndex += 1;
+      requestAudioAsset(next.id);
     }
 
     function playSe(assetId, volume, cooldown) {
@@ -95,7 +116,7 @@ exports.main = function main(param) {
     scene.onPointDownCapture.add(() => {
       if (!audioInteractionReady) {
         audioInteractionReady = true;
-        requestAudioGroup("bgm");
+        requestAudioAsset("gameBgm");
       } else {
         startGameBgm();
       }
@@ -274,6 +295,7 @@ exports.main = function main(param) {
     let ended = false;
     let toastLeft = 0;
     let forceUiLeft = 0;
+    let fastUiLeft = 0;
     let appliedMonsterTier = 0;
     let knownCostLimit = Logic.costLimit(0);
     let summonSerial = 0;
@@ -536,7 +558,9 @@ exports.main = function main(param) {
     }
 
     function currentCost() {
-      return minions.reduce((sum, m) => sum + m.cost, 0);
+      let total = 0;
+      for (let i = 0; i < minions.length; ++i) total += minions[i].cost;
+      return total;
     }
 
     function currentCostLimit() {
@@ -548,7 +572,10 @@ exports.main = function main(param) {
     }
 
     function canAddCatalyst(id) {
-      const already = selected.filter((selectedId) => selectedId === id).length;
+      let already = 0;
+      for (let i = 0; i < selected.length; ++i) {
+        if (selected[i] === id) already += 1;
+      }
       return selected.length < 3 && already < inventory[id] && selected.length + 1 <= remainingCost();
     }
 
@@ -1227,7 +1254,9 @@ exports.main = function main(param) {
     }
 
     function burst(x, y, color, count) {
-      const particleCount = Math.min(count, Math.max(0, MAX_EFFECTS - effects.length));
+      const crowded = minions.length + enemies.length >= CROWDED_UNIT_THRESHOLD;
+      const requestedCount = crowded ? Math.min(count, count >= 12 ? 6 : 3) : count;
+      const particleCount = Math.min(requestedCount, Math.max(0, MAX_EFFECTS - effects.length));
       for (let i = 0; i < particleCount; ++i) {
         const angle = random.generate() * Math.PI * 2;
         const speed = 35 + random.generate() * 75;
@@ -1370,8 +1399,7 @@ exports.main = function main(param) {
       const showRuleHint = elapsed < 18;
       setEntityVisible(ruleHintBg, showRuleHint);
       setEntityVisible(ruleHintLabel, showRuleHint);
-      if (audioInteractionReady && elapsed >= 1 && audioGroupStates.bgm !== "loading") requestAudioGroup("commonSe");
-      if (audioInteractionReady && elapsed >= 12 && audioGroupStates.commonSe !== "loading") requestAudioGroup("lateSe");
+      pumpAudioLoading();
       const monsterTier = Logic.corruptionTier(elapsed);
       if (monsterTier > appliedMonsterTier) {
         appliedMonsterTier = monsterTier;
@@ -1403,15 +1431,18 @@ exports.main = function main(param) {
         }
       }
       setEntityVisible(pauseIndicator, battlePaused);
-        const pauseDisplay = Math.max(0, Math.ceil(summonPauseLeft * 5) / 5).toFixed(1);
-        setLabelText(pauseIndicator, battlePaused ? "戦術停止 " + pauseDisplay + "　召喚地点をタップ" : "");
-      setLabelText(phaseLabel, difficulty.name + "　" + (battlePaused ? "戦術停止" : phaseName() + "　魔軍×" + Logic.monsterTierBoost(monsterTier).toFixed(2)));
-      refreshSummonGuidance();
-      setLabelText(statusLabel, "軍勢 " + currentCost() + "/" + costLimit + "  死亡 " + deaths);
-
       comboLeft -= DT;
       if (comboLeft <= 0) combo = 0;
-      setLabelText(comboLabel, combo >= 2 ? combo + " COMBO  ×" + (1 + Math.min(10, combo - 1) * 0.1).toFixed(1) : "");
+      fastUiLeft -= DT;
+      if (fastUiLeft <= 0) {
+        fastUiLeft = 0.1;
+        const pauseDisplay = Math.max(0, Math.ceil(summonPauseLeft * 5) / 5).toFixed(1);
+        setLabelText(pauseIndicator, battlePaused ? "戦術停止 " + pauseDisplay + "　召喚地点をタップ" : "");
+        setLabelText(phaseLabel, difficulty.name + "　" + (battlePaused ? "戦術停止" : phaseName() + "　魔軍×" + Logic.monsterTierBoost(monsterTier).toFixed(2)));
+        refreshSummonGuidance();
+        setLabelText(statusLabel, "軍勢 " + currentCost() + "/" + costLimit + "  死亡 " + deaths);
+        setLabelText(comboLabel, combo >= 2 ? combo + " COMBO  ×" + (1 + Math.min(10, combo - 1) * 0.1).toFixed(1) : "");
+      }
       toastLeft -= DT;
       if (toastLeft <= 0 && toastLabel.visible()) toastLabel.hide();
 
@@ -1444,7 +1475,7 @@ exports.main = function main(param) {
       updateEffects(DT);
       forceUiLeft -= DT;
       if (forceUiLeft <= 0) {
-        forceUiLeft = 0.35;
+        forceUiLeft = 0.65;
         refreshForcePanels();
         refreshKingHp();
       }
