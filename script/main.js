@@ -43,26 +43,39 @@ exports.main = function main(param) {
     const loadedAudioIds = {};
     const audioGroupStates = { bgm: "idle", commonSe: "idle", lateSe: "idle" };
     let gameBgmPlayer = null;
+    let audioInteractionReady = false;
 
     function startGameBgm() {
-      if (!loadedAudioIds.gameBgm || gameBgmPlayer || ended) return;
-      gameBgmPlayer = scene.asset.getAudioById("gameBgm").play();
-      gameBgmPlayer.changeVolume(0.32);
+      if (!audioInteractionReady || !loadedAudioIds.gameBgm || gameBgmPlayer || ended) return;
+      try {
+        const player = scene.asset.getAudioById("gameBgm").play();
+        player.changeVolume(0.32);
+        gameBgmPlayer = player;
+      } catch (_error) {
+        // iOS の自動再生制限などで失敗してもゲーム進行は止めない。
+        void _error;
+        gameBgmPlayer = null;
+      }
     }
 
     function requestAudioGroup(groupName) {
       if (audioGroupStates[groupName] !== "idle") return;
       const assetIds = AUDIO_GROUPS[groupName];
       audioGroupStates[groupName] = "loading";
-      scene.requestAssets({ assetIds, notifyErrorOnCallback: true }, (error) => {
-        if (error) {
-          audioGroupStates[groupName] = "failed";
-          return;
-        }
-        audioGroupStates[groupName] = "ready";
-        assetIds.forEach((assetId) => { loadedAudioIds[assetId] = true; });
-        if (groupName === "bgm") startGameBgm();
-      });
+      try {
+        scene.requestAssets({ assetIds, notifyErrorOnCallback: true }, (error) => {
+          if (error) {
+            audioGroupStates[groupName] = "failed";
+            return;
+          }
+          audioGroupStates[groupName] = "ready";
+          assetIds.forEach((assetId) => { loadedAudioIds[assetId] = true; });
+          if (groupName === "bgm") startGameBgm();
+        });
+      } catch (_error) {
+        void _error;
+        audioGroupStates[groupName] = "failed";
+      }
     }
 
     function playSe(assetId, volume, cooldown) {
@@ -70,9 +83,23 @@ exports.main = function main(param) {
       const now = g.game.age / g.game.fps;
       if (seCooldownUntil[assetId] && seCooldownUntil[assetId] > now) return;
       seCooldownUntil[assetId] = now + (cooldown || 0);
-      const player = scene.asset.getAudioById(assetId).play();
-      player.changeVolume(volume == null ? 0.7 : volume);
+      try {
+        const player = scene.asset.getAudioById(assetId).play();
+        player.changeVolume(volume == null ? 0.7 : volume);
+      } catch (_error) {
+        // 音声再生の可否に関係なくゲームロジックを継続する。
+        void _error;
+      }
     }
+
+    scene.onPointDownCapture.add(() => {
+      if (!audioInteractionReady) {
+        audioInteractionReady = true;
+        requestAudioGroup("bgm");
+      } else {
+        startGameBgm();
+      }
+    });
 
     function setLabelText(label, text) {
       if (label.text === text) return false;
@@ -223,13 +250,13 @@ exports.main = function main(param) {
     });
     const ruleHintLabel = new g.Label({
       scene, x: W / 2, y: TOP + 10, anchorX: 0.5, font: font16,
-      text: "触媒を拾う → 画面下で選ぶ → 戦場タップで召喚", textColor: "#fff0a5"
+      text: "触媒を拾う → 画面下で選ぶ → フィールドタップで召喚", textColor: "#fff0a5"
     });
     root.append(ruleHintBg); root.append(ruleHintLabel);
 
     const inventoryPanel = new g.FilledRect({ scene, x: 0, y: FIELD_BOTTOM, width: W, height: H - FIELD_BOTTOM, cssColor: "#0b1513" });
     root.append(inventoryPanel);
-    root.append(new g.Label({ scene, x: 12, y: FIELD_BOTTOM + 5, font: font12, text: "触媒を1～3個選び、戦場の召喚地点をタップ", textColor: "#b9c9c3" }));
+    root.append(new g.Label({ scene, x: 12, y: FIELD_BOTTOM + 5, font: font12, text: "触媒を1～3個選び、フィールドの召喚地点をタップ", textColor: "#b9c9c3" }));
 
     let elapsed = 0;
     let phase = "ready";
@@ -260,7 +287,7 @@ exports.main = function main(param) {
     Logic.CATALYSTS.forEach((c) => { inventory[c.id] = 1; });
     let selected = [];
     let summonPauseLeft = 0;
-    let kingDragStart = null;
+    let fieldDragStart = null;
 
     const king = {
       x: W / 2,
@@ -274,7 +301,7 @@ exports.main = function main(param) {
       targetX: W / 2,
       targetY: 450
     };
-    const kingBody = atlasSprite(0, 0, king.x - 28, king.y - 28, 56, 56, true);
+    const kingBody = atlasSprite(0, 0, king.x - 28, king.y - 28, 56, 56, false);
     root.append(kingBody);
     const kingCrown = new g.Label({ scene, x: king.x, y: king.y - 31, anchorX: 0.5, font: font16, text: "魔王", textColor: "#ffe4a6" });
     root.append(kingCrown);
@@ -286,28 +313,28 @@ exports.main = function main(param) {
       new g.FilledRect({ scene, x: 724, y: FIELD_BOTTOM + 22, width: 4, height: 90, cssColor: "#ffe56a" })
     ];
     inventoryGuideBorders.forEach((border) => root.append(border));
-    const selectionLabel = new g.Label({ scene, x: 770, y: FIELD_BOTTOM + 5, font: font12, text: "① 触媒を1～3個選択", textColor: "#ffffff" });
+    const selectionLabel = new g.Label({ scene, x: 770, y: FIELD_BOTTOM + 5, font: font12, text: "", textColor: "#ffffff" });
     root.append(selectionLabel);
     const previewLabel = new g.Label({ scene, x: 770, y: FIELD_BOTTOM + 26, width: 390, font: font16, text: "", textColor: "#8ee6c3" });
     root.append(previewLabel);
     const toastLabel = new g.Label({ scene, x: W / 2, y: FIELD_BOTTOM - 44, anchorX: 0.5, font: font20, text: "", textColor: "#fff0a5", hidden: true });
     root.append(toastLabel);
     const pauseBanner = new g.FilledRect({
-      scene, x: W / 2 - 285, y: TOP + 94, width: 570, height: 42,
+      scene, x: 350, y: TOP + 94, width: 480, height: 42,
       cssColor: "#5c4618", opacity: 0.9, hidden: true
     });
     root.append(pauseBanner);
     const pauseIndicator = new g.Label({
-      scene, x: W / 2, y: TOP + 103, anchorX: 0.5, font: font20,
+      scene, x: 590, y: TOP + 103, anchorX: 0.5, font: font20,
       text: "", textColor: "#fff0a5", hidden: true
     });
     root.append(pauseIndicator);
 
     const enemyPanel = new g.FilledRect({ scene, x: 10, y: TOP + 38, width: 330, height: 48, cssColor: "#1a2024", opacity: 0.64 });
-    const allyPanel = new g.FilledRect({ scene, x: W - 510, y: TOP + 38, width: 500, height: 48, cssColor: "#17241f", opacity: 0.68 });
+    const allyPanel = new g.FilledRect({ scene, x: W - 440, y: TOP + 38, width: 430, height: 48, cssColor: "#17241f", opacity: 0.68 });
     root.append(enemyPanel); root.append(allyPanel);
     const enemyTitle = new g.Label({ scene, x: 20, y: TOP + 45, font: font16, text: "敵勢力 0", textColor: "#ffb0a4" });
-    const allyTitle = new g.Label({ scene, x: W - 500, y: TOP + 45, font: font16, text: "味方勢力 0/6", textColor: "#9cf0ba" });
+    const allyTitle = new g.Label({ scene, x: W - 430, y: TOP + 45, font: font16, text: "味方勢力 0/6", textColor: "#9cf0ba" });
     root.append(enemyTitle); root.append(allyTitle);
     const enemyRows = [];
     const allyRows = [];
@@ -316,9 +343,34 @@ exports.main = function main(param) {
       enemyRows.push(label); root.append(label);
     }
     for (let i = 0; i < 7; ++i) {
-      const label = new g.Label({ scene, x: W - 500, y: TOP + 72 + i * 22, width: 482, font: font12, text: "", textColor: "#d8eee0" });
+      const label = new g.Label({ scene, x: W - 430, y: TOP + 72 + i * 22, width: 412, font: font12, text: "", textColor: "#d8eee0" });
       allyRows.push(label); root.append(label);
     }
+    const forcePanelEntities = [enemyPanel, allyPanel, enemyTitle, allyTitle, ...enemyRows, ...allyRows];
+    let forcePanelsVisible = true;
+    const forceToggleButton = new g.FilledRect({
+      scene, x: W - 172, y: TOP + 5, width: 162, height: 30,
+      cssColor: "#315b4b", opacity: 0.94, touchable: true
+    });
+    const forceToggleLabel = new g.Label({
+      scene, x: W - 91, y: TOP + 10, anchorX: 0.5,
+      font: font12, text: "勢力表示 ON", textColor: "#ffffff"
+    });
+    root.append(forceToggleButton);
+    root.append(forceToggleLabel);
+
+    function setForcePanelsVisible(visible) {
+      forcePanelsVisible = visible;
+      forcePanelEntities.forEach((entity) => setEntityVisible(entity, visible));
+      forceToggleButton.cssColor = visible ? "#315b4b" : "#3b4541";
+      forceToggleButton.modified();
+      setLabelText(forceToggleLabel, visible ? "勢力表示 ON" : "勢力表示 OFF");
+      if (visible) refreshForcePanels();
+    }
+
+    forceToggleButton.onPointDown.add(() => {
+      setForcePanelsVisible(!forcePanelsVisible);
+    });
 
     const buttons = [];
     Logic.CATALYSTS.forEach((cat, i) => {
@@ -369,23 +421,25 @@ exports.main = function main(param) {
     });
 
     battlefieldInput.onPointDown.add((ev) => {
-      if (phase !== "play" || ended || !selected.length) return;
-      summon(ev.point.x, TOP + ev.point.y);
-    });
-
-    kingBody.onPointDown.add((_ev) => {
-      if (!king.alive || phase !== "play") return;
+      if (phase !== "play" || ended) return;
+      if (selected.length) {
+        summon(ev.point.x, TOP + ev.point.y);
+        return;
+      }
+      if (!king.alive) return;
       releaseVirtualPad();
-      kingDragStart = { x: king.x, y: king.y };
+      fieldDragStart = { x: king.x, y: king.y };
       king.targetX = king.x;
       king.targetY = king.y;
     });
-    kingBody.onPointMove.add((ev) => {
-      if (!king.alive || phase !== "play" || !kingDragStart) return;
-      king.targetX = Logic.clamp(kingDragStart.x + ev.startDelta.x, 24, W - 24);
-      king.targetY = Logic.clamp(kingDragStart.y + ev.startDelta.y, TOP + 24, FIELD_BOTTOM - 24);
+    battlefieldInput.onPointMove.add((ev) => {
+      if (!king.alive || phase !== "play" || selected.length || !fieldDragStart) return;
+      king.targetX = Logic.clamp(fieldDragStart.x + ev.startDelta.x, 24, W - 24);
+      king.targetY = Logic.clamp(fieldDragStart.y + ev.startDelta.y, TOP + 24, FIELD_BOTTOM - 24);
     });
-    kingBody.onPointUp.add(() => { stopKingMovement(); });
+    battlefieldInput.onPointUp.add(() => {
+      if (fieldDragStart) stopKingMovement();
+    });
 
     const PAD_SIZE = MOBILE_CONTROL_SIZE;
     const PAD_CENTER = PAD_SIZE / 2;
@@ -453,7 +507,7 @@ exports.main = function main(param) {
         virtualPadVector.y = dy / distance * strength;
       }
       virtualPadActive = true;
-      kingDragStart = null;
+      fieldDragStart = null;
       king.targetX = king.x;
       king.targetY = king.y;
       padKnob.x = PAD_X + PAD_CENTER - padKnob.width / 2 + virtualPadVector.x * 27;
@@ -499,7 +553,7 @@ exports.main = function main(param) {
     }
 
     function stopKingMovement() {
-      kingDragStart = null;
+      fieldDragStart = null;
       king.targetX = king.x;
       king.targetY = king.y;
       releaseVirtualPad();
@@ -559,7 +613,7 @@ exports.main = function main(param) {
         b.name.modified();
       });
       const names = selected.map((id) => Logic.CATALYSTS.find((c) => c.id === id).name);
-      selectionLabel.text = names.length ? "選択中: " + names.join(" + ") : remainingCost() > 0 ? "① 触媒を1～3個選択" : "軍勢上限：召喚できません";
+      selectionLabel.text = names.length ? "選択中: " + names.join(" + ") : remainingCost() > 0 ? "" : "軍勢上限：召喚できません";
       selectionLabel.invalidate();
     }
 
@@ -568,7 +622,7 @@ exports.main = function main(param) {
         previewLabel.text = remainingCost() > 0 ? "光っている触媒ボタンをタップ" : "味方の撃破か次の上限拡張を待ってください";
       } else {
         const spec = Logic.summonSpec(selected, "field", elapsed, false);
-        previewLabel.text = spec.name + " → ② 戦場の召喚地点をタップ";
+        previewLabel.text = spec.name;
       }
       previewLabel.invalidate();
     }
@@ -643,6 +697,7 @@ exports.main = function main(param) {
     }
 
     function refreshForcePanels() {
+      if (!forcePanelsVisible) return;
       setLabelText(enemyTitle, "敵勢力 " + enemies.length);
       const enemyCounts = {};
       enemies.forEach((enemy) => { enemyCounts[enemy.name] = (enemyCounts[enemy.name] || 0) + 1; });
@@ -1238,10 +1293,10 @@ exports.main = function main(param) {
       const panel = new g.FilledRect({ scene, x: 150, y: 54, width: 980, height: 606, cssColor: "#172923" });
       const readyTitle = new g.Label({ scene, x: W / 2, y: 76, anchorX: 0.5, font: font42, text: "触媒モンスター ~最弱魔王の防衛戦~", textColor: "#f3d78b" });
       const lines = [
-        "パッドで魔王を動かし、フィールドの触媒を拾う",
+        "フィールドをドラッグして魔王を動かし、触媒を拾う",
         "画面下の触媒を1～3個選ぶ（選択中は戦闘停止）",
-        "光った戦場をタップしてモンスターを召喚",
-        "モンスターは自動戦闘。魔王は倒されても3秒後に復活"
+        "光ったフィールドをタップしてモンスターを召喚",
+        "モンスターは自動戦闘。魔王は3秒で復活／右上で勢力表示切替"
       ];
       const entities = [overlay, panel, readyTitle];
       entities.forEach((entity) => root.append(entity));
@@ -1280,7 +1335,6 @@ exports.main = function main(param) {
       hardButton.onPointDown.add(() => { difficultyId = "hard"; refreshDifficultySelection(); });
       function beginGame() {
         if (phase !== "ready") return;
-        requestAudioGroup("bgm");
         startGameBgm();
         entities.forEach((entity) => entity.destroy());
         phase = "play";
@@ -1299,7 +1353,6 @@ exports.main = function main(param) {
     refreshForcePanels();
     updateSelectionPreview();
     refreshSummonGuidance(true);
-    requestAudioGroup("bgm");
     for (let i = 0; i < 10; ++i) {
       spawnDrop(90 + random.generate() * (W - 180), TOP + 70 + random.generate() * (FIELD_BOTTOM - TOP - 130));
     }
@@ -1317,8 +1370,8 @@ exports.main = function main(param) {
       const showRuleHint = elapsed < 18;
       setEntityVisible(ruleHintBg, showRuleHint);
       setEntityVisible(ruleHintLabel, showRuleHint);
-      if (elapsed >= 1 && audioGroupStates.bgm !== "loading") requestAudioGroup("commonSe");
-      if (elapsed >= 12 && audioGroupStates.commonSe !== "loading") requestAudioGroup("lateSe");
+      if (audioInteractionReady && elapsed >= 1 && audioGroupStates.bgm !== "loading") requestAudioGroup("commonSe");
+      if (audioInteractionReady && elapsed >= 12 && audioGroupStates.commonSe !== "loading") requestAudioGroup("lateSe");
       const monsterTier = Logic.corruptionTier(elapsed);
       if (monsterTier > appliedMonsterTier) {
         appliedMonsterTier = monsterTier;
@@ -1351,7 +1404,7 @@ exports.main = function main(param) {
       }
       setEntityVisible(pauseIndicator, battlePaused);
         const pauseDisplay = Math.max(0, Math.ceil(summonPauseLeft * 5) / 5).toFixed(1);
-        setLabelText(pauseIndicator, battlePaused ? "② 召喚地点をタップ　戦術停止 " + pauseDisplay : "");
+        setLabelText(pauseIndicator, battlePaused ? "戦術停止 " + pauseDisplay + "　召喚地点をタップ" : "");
       setLabelText(phaseLabel, difficulty.name + "　" + (battlePaused ? "戦術停止" : phaseName() + "　魔軍×" + Logic.monsterTierBoost(monsterTier).toFixed(2)));
       refreshSummonGuidance();
       setLabelText(statusLabel, "軍勢 " + currentCost() + "/" + costLimit + "  死亡 " + deaths);
