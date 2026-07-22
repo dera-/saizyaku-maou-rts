@@ -39,7 +39,7 @@
 			"type": "image",
 			"path": "assets/font/pixelmplus-15.png",
 			"width": 512,
-			"height": 192
+			"height": 208
 		},
 		"font15Glyphs": {
 			"type": "text",
@@ -49,7 +49,7 @@
 			"type": "image",
 			"path": "assets/font/pixelmplus-20.png",
 			"width": 512,
-			"height": 320
+			"height": 344
 		},
 		"font20Glyphs": {
 			"type": "text",
@@ -58,8 +58,8 @@
 		"font24Image": {
 			"type": "image",
 			"path": "assets/font/pixelmplus-24.png",
-			"width": 512,
-			"height": 460
+			"width": 1024,
+			"height": 244
 		},
 		"font24Glyphs": {
 			"type": "text",

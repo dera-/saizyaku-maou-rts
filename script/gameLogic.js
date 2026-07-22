@@ -29,6 +29,15 @@ const TERRAIN = {
 
 const MONSTER_TIER_BOOSTS = [0.88, 1.15, 1.5, 2];
 
+const HARD_PREFERRED_TERRAIN = {
+  bone: "grave",
+  fang: "road",
+  iron: "rock",
+  mana: "mana",
+  mushroom: "swamp",
+  soul: "grave"
+};
+
 const DIFFICULTIES = {
   normal: {
     id: "normal", name: "ノーマル", enemyHp: 1, enemyAttack: 1,
@@ -94,6 +103,20 @@ function difficultySettings(id) {
   return DIFFICULTIES[id] || DIFFICULTIES.normal;
 }
 
+function hardPreferredTerrain(primary) {
+  return HARD_PREFERRED_TERRAIN[primary] || "field";
+}
+
+function hasHardTerrainAffinity(primary, terrainId) {
+  return hardPreferredTerrain(primary) === terrainId;
+}
+
+function hardEnemyDamageMultiplier(minion) {
+  const cost = clamp(Math.floor(minion.cost || 1), 1, 3);
+  const rankMultiplier = [0, 1.55, 1.08, 0.88][cost];
+  return rankMultiplier * (minion.hardPrepared ? 0.78 : 1);
+}
+
 function scoreAward(basePoints, difficultyId) {
   return Math.floor(Math.max(0, basePoints) * difficultySettings(difficultyId).scoreMultiplier);
 }
@@ -136,7 +159,7 @@ function recipeName(ids) {
   return catalystById(ids[1]).name + "の" + base;
 }
 
-function summonSpec(ids, terrainId, elapsed, nearKing) {
+function summonSpec(ids, terrainId, elapsed, nearKing, difficultyId) {
   if (!ids || ids.length < 1 || ids.length > 3) throw new Error("触媒は1～3個必要です");
   const primary = ids[0];
   const base = BASE_STATS[primary];
@@ -161,6 +184,22 @@ function summonSpec(ids, terrainId, elapsed, nearKing) {
     stats.attack *= 1.22;
   }
   if (nearKing) stats.tactic = "guard";
+
+  const hardMode = difficultySettings(difficultyId).id === "hard";
+  const terrainAffinity = hasHardTerrainAffinity(primary, terrainId);
+  stats.hardPrepared = false;
+  stats.terrainAffinity = terrainAffinity;
+  if (hardMode) {
+    const recipeBoost = ids.length === 1 ? 0.82 : ids.length === 2 ? 1.06 : 1.2;
+    stats.hp *= recipeBoost;
+    stats.attack *= recipeBoost;
+    if (terrainAffinity) {
+      stats.hp *= 1.25;
+      stats.attack *= 1.25;
+      stats.cooldown *= 0.92;
+      stats.hardPrepared = ids.length >= 2;
+    }
+  }
 
   const tier = corruptionTier(elapsed);
   const tierBoost = monsterTierBoost(tier);
@@ -189,6 +228,9 @@ module.exports = {
   enemyExtraSpawnChance,
   monsterTierBoost,
   difficultySettings,
+  hardPreferredTerrain,
+  hasHardTerrainAffinity,
+  hardEnemyDamageMultiplier,
   scoreAward,
   corruptionTier,
   costLimit,

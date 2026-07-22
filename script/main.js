@@ -218,7 +218,7 @@ exports.main = function main(param) {
       });
       root.append(rect);
       root.append(label);
-      terrainViews.push({ rect, label });
+      terrainViews.push({ zone, rect, label });
     });
     const fieldEffectLabel = new g.Label({
       scene, x: 12, y: FIELD_BOTTOM - 20, width: 360, font: font12,
@@ -659,8 +659,14 @@ exports.main = function main(param) {
       if (!selected.length) {
         previewLabel.text = remainingCost() > 0 ? "光っている触媒ボタンをタップ" : "味方の撃破か次の上限拡張を待ってください";
       } else {
-        const spec = Logic.summonSpec(selected, "field", elapsed, false);
-        previewLabel.text = spec.name;
+        const spec = Logic.summonSpec(selected, "field", elapsed, false, difficultyId);
+        if (difficultyId === "hard") {
+          const preferred = Logic.hardPreferredTerrain(spec.primary);
+          const rankHint = selected.length >= 2 ? "★共鳴可能" : "2触媒以上で共鳴";
+          previewLabel.text = spec.name + "　適性：" + Logic.TERRAIN[preferred].name + "（" + rankHint + "）";
+        } else {
+          previewLabel.text = spec.name;
+        }
       }
       previewLabel.invalidate();
     }
@@ -700,9 +706,13 @@ exports.main = function main(param) {
         }
       });
       setEntityVisible(pauseBanner, choosing);
-      if (stateChanged) {
+      if (stateChanged || force) {
         terrainViews.forEach((view) => {
+          const info = Logic.TERRAIN[view.zone.id];
+          const affinity = choosing && difficultyId === "hard" && Logic.hasHardTerrainAffinity(selected[0], view.zone.id);
+          setLabelText(view.label, info.name + "：" + info.effect + (affinity ? " ★適性" : ""));
           view.rect.opacity = choosing ? 0.42 : 0.18;
+          view.rect.cssColor = affinity ? "#8a7024" : info.color;
           view.label.opacity = choosing ? 1 : 0.86;
           view.rect.modified();
           view.label.modified();
@@ -752,8 +762,8 @@ exports.main = function main(param) {
       setLabelText(allyTitle, "味方勢力 " + minions.length + "体 / コスト" + currentCost() + "/" + currentCostLimit());
       const groups = {};
       minions.forEach((minion) => {
-        const key = minion.name + "/" + minion.primary + "/" + minion.tactic;
-        if (!groups[key]) groups[key] = { name: minion.name, primary: minion.primary, tactic: minion.tactic, tier: minion.tier, count: 0, hp: 0, maxHp: 0 };
+        const key = minion.name + "/" + minion.primary + "/" + minion.tactic + "/" + minion.hardPrepared;
+        if (!groups[key]) groups[key] = { name: minion.name, primary: minion.primary, tactic: minion.tactic, tier: minion.tier, prepared: minion.hardPrepared, count: 0, hp: 0, maxHp: 0 };
         groups[key].tier = Math.max(groups[key].tier, minion.tier);
         groups[key].count += 1;
         groups[key].hp += Math.max(0, minion.hp);
@@ -771,7 +781,7 @@ exports.main = function main(param) {
         if (index < 6 && allyGroups[index]) {
           const group = allyGroups[index];
           const countText = group.count > 1 ? "×" + group.count : "";
-          text = group.name.slice(0, 11) + countText + " T" + (group.tier + 1) + " HP" + Math.ceil(group.hp) + "/" + group.maxHp + "  " + speciesName(group.primary) + "/" + tacticName(group.tactic);
+          text = (group.prepared ? "★" : "") + group.name.slice(0, 11) + countText + " T" + (group.tier + 1) + " HP" + Math.ceil(group.hp) + "/" + group.maxHp + "  " + speciesName(group.primary) + "/" + tacticName(group.tactic);
         } else if (index === 6 && allyGroups.length > 6) {
           text = "ほか " + (allyGroups.length - 6) + "編成";
         }
@@ -783,7 +793,7 @@ exports.main = function main(param) {
       if (!selected.length) return;
       const terrain = terrainAt(x, y);
       const near = Logic.distance({ x, y }, king) < 150;
-      const spec = Logic.summonSpec(selected, terrain, elapsed, near);
+      const spec = Logic.summonSpec(selected, terrain, elapsed, near, difficultyId);
       if (currentCost() + spec.cost > currentCostLimit()) {
         showToast("軍勢上限です（" + currentCost() + "/" + currentCostLimit() + "）", "#ff9b9b");
         return;
@@ -805,7 +815,8 @@ exports.main = function main(param) {
       });
       playSe("summonSe", 0.72, 0.1);
       burst(x, y, spec.color, 6);
-      showToast(spec.name + " 召喚！ " + Logic.TERRAIN[terrain].name + "［" + Logic.TERRAIN[terrain].effect + "］", spec.color);
+      const hardResult = difficultyId !== "hard" ? "" : spec.hardPrepared ? " ★地形共鳴！" : spec.cost === 1 ? " △低位召喚" : "";
+      showToast(spec.name + " 召喚！ " + Logic.TERRAIN[terrain].name + "［" + Logic.TERRAIN[terrain].effect + "］" + hardResult, spec.color);
       selected = [];
       summonPauseLeft = 0;
       stopKingMovement();
@@ -859,6 +870,10 @@ exports.main = function main(param) {
       knight: { name: "騎士", hp: 180, attack: 24, speed: 43, range: 40, cooldown: 1.0, score: 500, color: "#8aa9c9", tactic: "duel", size: 20 },
       hero: { name: "勇者", hp: 980, attack: 38, speed: 61, range: 44, cooldown: 0.68, score: 10000, color: "#ffd34e", tactic: "king", size: 28 }
     };
+    const HARD_ENEMY_NAMES = {
+      fighter: "掃討戦士", rogue: "突破盗賊", archer: "狙撃弓兵",
+      cleric: "軍師僧侶", knight: "粉砕騎士", hero: "勇者"
+    };
 
     function chooseEnemyType() {
       const r = random.generate();
@@ -884,7 +899,7 @@ exports.main = function main(param) {
       const hpBar = new g.FilledRect({ scene, x: x - 20, y: y - base.size - 7, width: 40, height: 4, cssColor: typeId === "hero" ? "#ffd34e" : "#e46c6c" });
       unitLayer.append(body); unitLayer.append(hpBg); unitLayer.append(hpBar);
       enemies.push({
-        ...base, typeId, x, y, hp, maxHp: hp,
+        ...base, typeId, name: difficultyId === "hard" ? HARD_ENEMY_NAMES[typeId] : base.name, x, y, hp, maxHp: hp,
         attack: base.attack * mult * difficulty.enemyAttack,
         speed: base.speed * difficulty.enemySpeed,
         cooldown: base.cooldown * difficulty.enemyCooldown,
@@ -913,6 +928,48 @@ exports.main = function main(param) {
         }
       });
       return { target: best, distance: Math.sqrt(bestDistanceSquared) };
+    }
+
+    function hardTargetForEnemy(enemy) {
+      if (enemy.typeId === "rogue" || enemy.typeId === "hero") {
+        const interceptor = nearest(enemy, minions, (minion) => minion.tactic === "guard" && Logic.distance(minion, king) < 180);
+        if (interceptor.target && interceptor.distance < 260) return interceptor.target;
+        return king;
+      }
+      let best = null;
+      let bestScore = Infinity;
+      const searchRange = enemy.typeId === "archer" ? 360 : 285;
+      minions.forEach((minion) => {
+        const distance = Logic.distance(enemy, minion);
+        if (distance > searchRange) return;
+        let score = distance;
+        if (enemy.typeId === "fighter" || enemy.typeId === "knight") score += (minion.cost - 1) * 58;
+        if (enemy.typeId === "archer") {
+          score -= (1 - Math.max(0, minion.hp) / minion.maxHp) * 90;
+          if (!minion.hardPrepared) score -= 42;
+        }
+        if (score < bestScore) {
+          best = minion;
+          bestScore = score;
+        }
+      });
+      return best || king;
+    }
+
+    function enemyDamageAgainst(enemy, target) {
+      if (difficultyId !== "hard" || target === king) return enemy.attack;
+      return enemy.attack * Logic.hardEnemyDamageMultiplier(target);
+    }
+
+    function performHardCleave(enemy, center, primaryTarget) {
+      if (difficultyId !== "hard" || enemy.range >= 80) return;
+      if (enemy.typeId !== "fighter" && enemy.typeId !== "knight" && enemy.typeId !== "hero") return;
+      const radius = enemy.typeId === "hero" ? 82 : enemy.typeId === "knight" ? 68 : 52;
+      minions.forEach((minion) => {
+        if (minion === primaryTarget || Logic.distance(minion, center) > radius) return;
+        const splashDamage = enemy.attack * 0.42 * Logic.hardEnemyDamageMultiplier(minion);
+        applyDamage(minion, splashDamage, enemy.color, false);
+      });
     }
 
     function moveToward(unit, target, speed, dt, stopRange) {
@@ -1084,7 +1141,8 @@ exports.main = function main(param) {
         if (!king.alive) {
           target = e.scatterTarget;
           movementOnly = true;
-        } else if (e.tactic === "king") target = king;
+        } else if (difficultyId === "hard") target = hardTargetForEnemy(e);
+        else if (e.tactic === "king") target = king;
         else {
           const closeMinion = nearest(e, minions);
           target = closeMinion.target && closeMinion.distance < 210 ? closeMinion.target : king;
@@ -1096,7 +1154,8 @@ exports.main = function main(param) {
           if (d > desired) moveToward(e, target, movementOnly ? Math.max(110, e.speed * 1.8) : e.speed, dt, movementOnly ? 4 : desired - 2);
           if (!movementOnly && d <= desired + 4 && e.attackLeft <= 0) {
             e.attackLeft = e.cooldown;
-            performAttack(e, target, e.attack, false);
+            performAttack(e, target, enemyDamageAgainst(e, target), false);
+            performHardCleave(e, target, target);
           }
         }
         if (e.typeId === "cleric" && e.attackLeft <= 0) {
@@ -1350,7 +1409,7 @@ exports.main = function main(param) {
       const normalLabel = new g.Label({ scene, x: 420, y: 414, anchorX: 0.5, font: font20, text: "● ノーマル（選択中）", textColor: "#ffffff" });
       const normalDetail = new g.Label({ scene, x: 420, y: 449, anchorX: 0.5, font: font12, text: "標準難易度・HP自然回復あり", textColor: "#d5e5df" });
       const hardLabel = new g.Label({ scene, x: 860, y: 414, anchorX: 0.5, font: font20, text: "ハード", textColor: "#d4ddd9" });
-      const hardDetail = new g.Label({ scene, x: 860, y: 449, anchorX: 0.5, font: font12, text: "自然回復なし・敵強化・スコア5倍", textColor: "#f2b4a8" });
+      const hardDetail = new g.Label({ scene, x: 860, y: 449, anchorX: 0.5, font: font12, text: "敵AI・対群攻撃強化／地形共鳴・スコア5倍", textColor: "#f2b4a8" });
       const startButton = new g.FilledRect({ scene, x: 440, y: 498, width: 400, height: 68, cssColor: "#a45b35", touchable: true });
       const startLabel = new g.Label({ scene, x: W / 2, y: 510, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
       const countdownLabel = new g.Label({ scene, x: W / 2, y: 588, anchorX: 0.5, font: font20, text: "自動開始まで 10", textColor: "#f3d78b" });
@@ -1380,7 +1439,10 @@ exports.main = function main(param) {
         phase = "play";
         phaseLabel.text = difficulty.name + "　防衛開始";
         phaseLabel.invalidate();
-        showToast(difficulty.name + "で防衛開始！ 触媒を集めて召喚せよ", difficultyId === "hard" ? "#ffb0a4" : "#8ee6c3");
+        const startMessage = difficultyId === "hard"
+          ? "ハード開始！ 2～3触媒を適性地形へ置いて地形共鳴せよ"
+          : "ノーマルで防衛開始！ 触媒を集めて召喚せよ";
+        showToast(startMessage, difficultyId === "hard" ? "#ffb0a4" : "#8ee6c3");
       }
       startButton.onPointDown.add(beginGame);
       refreshDifficultySelection();

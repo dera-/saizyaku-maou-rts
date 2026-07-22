@@ -67,6 +67,28 @@ test("追加触媒、地形、時間が召喚性能と戦術を変える", () =>
   assert.equal(late.tier, 3);
 });
 
+test("ハードは2触媒以上と適性地形の組み合わせで地形共鳴する", () => {
+  const single = logic.summonSpec(["iron"], "rock", 45, false, "hard");
+  const misplaced = logic.summonSpec(["iron", "bone"], "swamp", 45, false, "hard");
+  const prepared = logic.summonSpec(["iron", "bone"], "rock", 45, false, "hard");
+  assert.equal(logic.hardPreferredTerrain("iron"), "rock");
+  assert.equal(single.terrainAffinity, true);
+  assert.equal(single.hardPrepared, false);
+  assert.equal(misplaced.hardPrepared, false);
+  assert.equal(prepared.hardPrepared, true);
+  assert.ok(prepared.hp > misplaced.hp);
+  assert.ok(prepared.attack > misplaced.attack);
+});
+
+test("ハード敵は低位召喚に強く、地形共鳴した高位召喚には弱い", () => {
+  const lowRank = logic.hardEnemyDamageMultiplier({ cost: 1, hardPrepared: false });
+  const highRank = logic.hardEnemyDamageMultiplier({ cost: 3, hardPrepared: false });
+  const prepared = logic.hardEnemyDamageMultiplier({ cost: 3, hardPrepared: true });
+  assert.equal(lowRank, 1.55);
+  assert.ok(highRank < 1);
+  assert.ok(prepared < highRank);
+});
+
 test("コンボと危険撃破でスコアが増える", () => {
   const normal = logic.scoreForKill(100, 0, 1, false);
   const bonus = logic.scoreForKill(100, 100, 5, true);
