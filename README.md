@@ -59,6 +59,23 @@
 
 画像はゲーム専用に生成したオリジナルの8-bit家庭用RPG風ピクセルアートです。スプライトはクロマキー除去後の透過PNGを使用し、Akashic Engine上ではアトラスの各セルを切り出して表示します。
 
+## フォント素材
+
+- 使用フォント: PixelMplus12 Regular / PixelMplus12 Bold
+- 作者: itouhiro（M+ BITMAP FONTSをTrueType化）
+- ライセンス: M+ FONT LICENSE（個人・商用を問わず利用、改変、再配布可能）
+- 配布元: https://github.com/itouhiro/PixelMplus
+- ライセンス原文: `assets/font/LICENSE_E.txt`
+
+ゲームのファミコン風RPG画面に合わせ、全ラベルをPixelMplus12のBitmapFontへ統一しています。`tools/generate-font-chars.js` でゲーム内の使用文字を `assets/font/chars.txt` に抽出し、`@akashic/bmpfont-generator` の `bmpfont-generator` コマンドで15px・20px・24pxの通常書体と32px・44pxの太字書体をPNG・JSONへ変換しています。アンチエイリアスを無効化してドットの輪郭を維持しています。
+
+生成例:
+
+```powershell
+node tools/generate-font-chars.js
+bmpfont-generator assets/font/PixelMplus12-Regular.ttf assets/font/pixelmplus-20.png -H 20 -f assets/font/chars.txt -m "？" -F "#ffffff" --no-anti-alias --json assets/font/pixelmplus-20.json --margin 1
+```
+
 ## BGM・効果音素材
 
 音楽・効果音：魔王魂（作曲：森田交一）、効果音ラボ

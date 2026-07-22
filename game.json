@@ -35,6 +35,56 @@
 			"width": 1280,
 			"height": 720
 		},
+		"font15Image": {
+			"type": "image",
+			"path": "assets/font/pixelmplus-15.png",
+			"width": 512,
+			"height": 192
+		},
+		"font15Glyphs": {
+			"type": "text",
+			"path": "assets/font/pixelmplus-15.json"
+		},
+		"font20Image": {
+			"type": "image",
+			"path": "assets/font/pixelmplus-20.png",
+			"width": 512,
+			"height": 320
+		},
+		"font20Glyphs": {
+			"type": "text",
+			"path": "assets/font/pixelmplus-20.json"
+		},
+		"font24Image": {
+			"type": "image",
+			"path": "assets/font/pixelmplus-24.png",
+			"width": 512,
+			"height": 460
+		},
+		"font24Glyphs": {
+			"type": "text",
+			"path": "assets/font/pixelmplus-24.json"
+		},
+		"font32Image": {
+			"type": "image",
+			"path": "assets/font/pixelmplus-bold-32.png",
+			"width": 1024,
+			"height": 432
+		},
+		"font32Glyphs": {
+			"type": "text",
+			"path": "assets/font/pixelmplus-bold-32.json"
+		},
+		"font44Image": {
+			"type": "image",
+			"path": "assets/font/pixelmplus-bold-44.png",
+			"width": 1024,
+			"height": 780
+		},
+		"font44Glyphs": {
+			"type": "text",
+			"path": "assets/font/pixelmplus-bold-44.json"
+		},
 		"gameBgm": {
 			"type": "audio",
 			"path": "assets/audio/maou_loop_bgm_8bit07",
@@ -156,6 +206,22 @@
 					".ogg"
 				]
 			}
+		},
+		"assets/font/PixelMplus12-Bold.ttf": {
+			"type": "binary",
+			"path": "assets/font/PixelMplus12-Bold.ttf"
+		},
+		"assets/font/PixelMplus12-Regular.ttf": {
+			"type": "binary",
+			"path": "assets/font/PixelMplus12-Regular.ttf"
+		},
+		"assets/font/chars.txt": {
+			"type": "text",
+			"path": "assets/font/chars.txt"
+		},
+		"assets/font/LICENSE_E.txt": {
+			"type": "text",
+			"path": "assets/font/LICENSE_E.txt"
 		}
 	},
 	"environment": {

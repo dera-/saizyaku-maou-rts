@@ -18,7 +18,12 @@ exports.main = function main(param) {
   const scene = new g.Scene({
     game: g.game,
     assetIds: [
-      "sprites", "field"
+      "sprites", "field",
+      "font15Image", "font15Glyphs",
+      "font20Image", "font20Glyphs",
+      "font24Image", "font24Glyphs",
+      "font32Image", "font32Glyphs",
+      "font44Image", "font44Glyphs"
     ]
   });
   const random = param.random || g.game.random;
@@ -37,11 +42,17 @@ exports.main = function main(param) {
     const CROWDED_UNIT_THRESHOLD = 28;
     const FINAL_COST_LIMIT = Logic.costLimit(GAME_TIME);
     const DT = 1 / g.game.fps;
-    const font12 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 15 });
-    const font16 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 20 });
-    const font20 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 24 });
-    const font28 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 32, fontWeight: "bold" });
-    const font42 = new g.DynamicFont({ game: g.game, fontFamily: "sans-serif", size: 44, fontWeight: "bold" });
+    function loadBitmapFont(imageId, glyphId) {
+      return new g.BitmapFont({
+        src: scene.asset.getImageById(imageId),
+        glyphInfo: JSON.parse(scene.asset.getTextContentById(glyphId))
+      });
+    }
+    const font12 = loadBitmapFont("font15Image", "font15Glyphs");
+    const font16 = loadBitmapFont("font20Image", "font20Glyphs");
+    const font20 = loadBitmapFont("font24Image", "font24Glyphs");
+    const font28 = loadBitmapFont("font32Image", "font32Glyphs");
+    const font42 = loadBitmapFont("font44Image", "font44Glyphs");
     const spriteAtlas = scene.asset.getImageById("sprites");
     const fieldImage = scene.asset.getImageById("field");
     const ATLAS_CELL = 256;
