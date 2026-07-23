@@ -35,7 +35,6 @@ exports.main = function main(param) {
     const TOP = 66;
     const FIELD_BOTTOM = 596;
     const GAME_TIME = 180;
-    const MAX_ENEMIES = 42;
     const MAX_PROJECTILES = 32;
     const MAX_EFFECTS = 44;
     const MAX_FLOATING_LABELS = 6;
@@ -273,8 +272,9 @@ exports.main = function main(param) {
     root.append(comboLabel);
     const kingHpLabel = new g.Label({ scene, x: TOP_STATUS_RIGHT, y: 34, anchorX: 1, font: font16, text: "魔王HP 50/50", textColor: "#ffb2c9" });
     root.append(kingHpLabel);
-    const kingHpBg = new g.FilledRect({ scene, x: W - 370 - TOP_STATUS_SHIFT_X, y: 15, width: 190, height: 12, cssColor: "#3d2630" });
-    const kingHpBar = new g.FilledRect({ scene, x: W - 370 - TOP_STATUS_SHIFT_X, y: 15, width: 190, height: 12, cssColor: "#e95780" });
+    const KING_HP_BAR_X = W - 430 - TOP_STATUS_SHIFT_X;
+    const kingHpBg = new g.FilledRect({ scene, x: KING_HP_BAR_X, y: 15, width: 190, height: 12, cssColor: "#3d2630" });
+    const kingHpBar = new g.FilledRect({ scene, x: KING_HP_BAR_X, y: 15, width: 190, height: 12, cssColor: "#e95780" });
     root.append(kingHpBg); root.append(kingHpBar);
     const ruleHintBg = new g.FilledRect({
       scene, x: W / 2 - 315, y: TOP + 5, width: 630, height: 32,
@@ -854,7 +854,7 @@ exports.main = function main(param) {
 
     function removeDrop(index, collectorName) {
       const drop = drops[index];
-      inventory[drop.id] = Math.min(9, inventory[drop.id] + 1);
+      inventory[drop.id] = Logic.addCatalyst(inventory[drop.id]);
       drop.body.destroy();
       drops.splice(index, 1);
       playSe("itemPickupSe", collectorName === "king" ? 0.62 : 0.48, 0.08);
@@ -885,7 +885,8 @@ exports.main = function main(param) {
     }
 
     function spawnEnemy(typeId) {
-      if (typeId !== "hero" && enemies.length >= MAX_ENEMIES) return false;
+      const spawnParameters = Logic.enemySpawnParameters(elapsed, difficultyId);
+      if (typeId !== "hero" && enemies.length >= spawnParameters.maxEnemies) return false;
       const base = ENEMY_TYPES[typeId];
       const gate = gates[Math.floor(random.generate() * gates.length)];
       const mult = typeId === "hero" ? 1 : Logic.enemyMultiplier(elapsed);
@@ -1409,7 +1410,7 @@ exports.main = function main(param) {
       const normalLabel = new g.Label({ scene, x: 420, y: 414, anchorX: 0.5, font: font20, text: "● ノーマル（選択中）", textColor: "#ffffff" });
       const normalDetail = new g.Label({ scene, x: 420, y: 449, anchorX: 0.5, font: font12, text: "標準難易度・HP自然回復あり", textColor: "#d5e5df" });
       const hardLabel = new g.Label({ scene, x: 860, y: 414, anchorX: 0.5, font: font20, text: "ハード", textColor: "#d4ddd9" });
-      const hardDetail = new g.Label({ scene, x: 860, y: 449, anchorX: 0.5, font: font12, text: "敵AI・対群攻撃強化／地形共鳴・スコア5倍", textColor: "#f2b4a8" });
+      const hardDetail = new g.Label({ scene, x: 860, y: 449, anchorX: 0.5, font: font12, text: "敵AI・敵数・対群強化／地形共鳴・スコア5倍", textColor: "#f2b4a8" });
       const startButton = new g.FilledRect({ scene, x: 440, y: 498, width: 400, height: 68, cssColor: "#a45b35", touchable: true });
       const startLabel = new g.Label({ scene, x: W / 2, y: 510, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
       const countdownLabel = new g.Label({ scene, x: W / 2, y: 588, anchorX: 0.5, font: font20, text: "自動開始まで 10", textColor: "#f3d78b" });
@@ -1437,6 +1438,7 @@ exports.main = function main(param) {
         startGameBgm();
         entities.forEach((entity) => entity.destroy());
         phase = "play";
+        if (difficultyId === "hard") spawnLeft *= difficulty.spawnIntervalMultiplier;
         phaseLabel.text = difficulty.name + "　防衛開始";
         phaseLabel.invalidate();
         const startMessage = difficultyId === "hard"
@@ -1522,9 +1524,10 @@ exports.main = function main(param) {
       if (!battlePaused) {
         spawnLeft -= DT;
         if (spawnLeft <= 0) {
+          const spawnParameters = Logic.enemySpawnParameters(elapsed, difficultyId);
           spawnEnemy(chooseEnemyType());
-          if (random.generate() < Logic.enemyExtraSpawnChance(elapsed)) spawnEnemy(chooseEnemyType());
-          spawnLeft = Logic.enemySpawnInterval(elapsed);
+          if (random.generate() < spawnParameters.extraChance) spawnEnemy(chooseEnemyType());
+          spawnLeft = spawnParameters.interval;
         }
         if (!bossSpawned && elapsed >= 160) { bossSpawned = true; spawnEnemy("hero"); }
 

@@ -79,7 +79,7 @@
 			"type": "image",
 			"path": "assets/font/pixelmplus-bold-44.png",
 			"width": 1024,
-			"height": 780
+			"height": 832
 		},
 		"font44Glyphs": {
 			"type": "text",
@@ -206,22 +206,6 @@
 					".ogg"
 				]
 			}
-		},
-		"assets/font/PixelMplus12-Bold.ttf": {
-			"type": "binary",
-			"path": "assets/font/PixelMplus12-Bold.ttf"
-		},
-		"assets/font/PixelMplus12-Regular.ttf": {
-			"type": "binary",
-			"path": "assets/font/PixelMplus12-Regular.ttf"
-		},
-		"assets/font/chars.txt": {
-			"type": "text",
-			"path": "assets/font/chars.txt"
-		},
-		"assets/font/LICENSE_E.txt": {
-			"type": "text",
-			"path": "assets/font/LICENSE_E.txt"
 		}
 	},
 	"environment": {

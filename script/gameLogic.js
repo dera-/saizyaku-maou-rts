@@ -41,11 +41,13 @@ const HARD_PREFERRED_TERRAIN = {
 const DIFFICULTIES = {
   normal: {
     id: "normal", name: "ノーマル", enemyHp: 1, enemyAttack: 1,
-    enemySpeed: 1, enemyCooldown: 1, scoreMultiplier: 1, kingRegen: 4
+    enemySpeed: 1, enemyCooldown: 1, scoreMultiplier: 1, kingRegen: 4,
+    spawnIntervalMultiplier: 1, extraSpawnBonus: 0, maxEnemies: 42
   },
   hard: {
     id: "hard", name: "ハード", enemyHp: 1.3, enemyAttack: 1.25,
-    enemySpeed: 1.08, enemyCooldown: 0.9, scoreMultiplier: 5, kingRegen: 0
+    enemySpeed: 1.08, enemyCooldown: 0.9, scoreMultiplier: 5, kingRegen: 0,
+    spawnIntervalMultiplier: 0.82, extraSpawnBonus: 0.1, maxEnemies: 48
   }
 };
 
@@ -95,6 +97,15 @@ function enemyExtraSpawnChance(elapsed) {
   return 0.14;
 }
 
+function enemySpawnParameters(elapsed, difficultyId) {
+  const settings = difficultySettings(difficultyId);
+  return {
+    interval: enemySpawnInterval(elapsed) * settings.spawnIntervalMultiplier,
+    extraChance: clamp(enemyExtraSpawnChance(elapsed) + settings.extraSpawnBonus, 0, 0.8),
+    maxEnemies: settings.maxEnemies
+  };
+}
+
 function monsterTierBoost(tier) {
   return MONSTER_TIER_BOOSTS[clamp(Math.floor(tier), 0, 3)];
 }
@@ -115,6 +126,10 @@ function hardEnemyDamageMultiplier(minion) {
   const cost = clamp(Math.floor(minion.cost || 1), 1, 3);
   const rankMultiplier = [0, 1.55, 1.08, 0.88][cost];
   return rankMultiplier * (minion.hardPrepared ? 0.78 : 1);
+}
+
+function addCatalyst(current, amount) {
+  return clamp(Math.floor(current) + (amount == null ? 1 : Math.floor(amount)), 0, 99);
 }
 
 function scoreAward(basePoints, difficultyId) {
@@ -226,11 +241,13 @@ module.exports = {
   enemyMultiplier,
   enemySpawnInterval,
   enemyExtraSpawnChance,
+  enemySpawnParameters,
   monsterTierBoost,
   difficultySettings,
   hardPreferredTerrain,
   hasHardTerrainAffinity,
   hardEnemyDamageMultiplier,
+  addCatalyst,
   scoreAward,
   corruptionTier,
   costLimit,

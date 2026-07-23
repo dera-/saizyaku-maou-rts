@@ -27,6 +27,17 @@ test("残り135秒から45秒の中盤は敵の追加出現率が段階的に上
   assert.deepEqual([44, 45, 75, 105, 135].map(logic.enemyExtraSpawnChance), [0, 0.04, 0.08, 0.16, 0.14]);
 });
 
+test("ハードは敵の出現間隔を短縮し追加出現率と同時出現上限を増やす", () => {
+  const normal = logic.enemySpawnParameters(90, "normal");
+  const hard = logic.enemySpawnParameters(90, "hard");
+  assert.equal(normal.interval, logic.enemySpawnInterval(90));
+  assert.equal(normal.extraChance, logic.enemyExtraSpawnChance(90));
+  assert.ok(hard.interval < normal.interval);
+  assert.ok(hard.extraChance > normal.extraChance);
+  assert.equal(normal.maxEnemies, 42);
+  assert.equal(hard.maxEnemies, 48);
+});
+
 test("軍勢コスト上限は45秒ごとに6から15まで拡張される", () => {
   assert.deepEqual([0, 44, 45, 89, 90, 134, 135, 180].map(logic.costLimit), [6, 6, 9, 9, 12, 12, 15, 15]);
 });
@@ -116,4 +127,10 @@ test("バーチャルパッドを離すと入力と古い移動目標が現在�
   assert.deepEqual(vector, { x: 0, y: 0 });
   assert.equal(king.targetX, king.x);
   assert.equal(king.targetY, king.y);
+});
+
+test("触媒は10個以上取得でき、99個で上限になる", () => {
+  assert.equal(logic.addCatalyst(9), 10);
+  assert.equal(logic.addCatalyst(10), 11);
+  assert.equal(logic.addCatalyst(99), 99);
 });
