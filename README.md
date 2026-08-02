@@ -71,13 +71,15 @@
 - 配布元: https://github.com/itouhiro/PixelMplus
 - ライセンス原文: `assets/font/LICENSE_E.txt`
 
-ゲームのファミコン風RPG画面に合わせ、全ラベルをPixelMplus12のBitmapFontへ統一しています。`tools/generate-font-chars.js` でゲーム内の使用文字を `assets/font/chars.txt` に抽出し、`@akashic/bmpfont-generator` の `bmpfont-generator` コマンドで15px・20px・24pxの通常書体と32px・44pxの太字書体をPNG・JSONへ変換しています。アンチエイリアスを無効化してドットの輪郭を維持しています。
+ゲームのファミコン風RPG画面に合わせ、全ラベルをPixelMplus12のBitmapFontへ統一しています。`tools/generate-font-chars.js` でゲーム内の使用文字を `assets/font/chars.txt` に抽出し、`@akashic/bmpfont-generator` の `bmpfont-generator` コマンドで18px・24px・28pxの通常書体と36px・48pxの太字書体をPNG・JSONへ変換しています。スマートフォンで縮小表示した際に文字の細い画素が欠けないよう、アンチエイリアスを有効にしています。
+
+配布データを軽量化するため、ゲーム実行に必要なPNG・JSONとライセンス文書のみ同梱しています。フォントを再生成する場合は、上記配布元から `PixelMplus12-Regular.ttf` / `PixelMplus12-Bold.ttf` を `assets/font` へ取得してから生成してください。`chars.txt` は生成スクリプト実行時に作成されます。
 
 生成例:
 
 ```powershell
 node tools/generate-font-chars.js
-bmpfont-generator assets/font/PixelMplus12-Regular.ttf assets/font/pixelmplus-20.png -H 20 -f assets/font/chars.txt -m "？" -F "#ffffff" --no-anti-alias --json assets/font/pixelmplus-20.json --margin 1
+bmpfont-generator assets/font/PixelMplus12-Regular.ttf assets/font/pixelmplus-24.png -H 24 -f assets/font/chars.txt -m "？" -F "#ffffff" --json assets/font/pixelmplus-24.json --margin 1
 ```
 
 ## BGM・効果音素材

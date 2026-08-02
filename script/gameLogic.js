@@ -1,12 +1,12 @@
 "use strict";
 
 const CATALYSTS = [
-  { id: "bone", name: "骨", color: "#e8dcc0", glyph: "骨", base: "スケルトン" },
-  { id: "fang", name: "牙", color: "#f2b36d", glyph: "牙", base: "魔獣" },
-  { id: "iron", name: "鉄", color: "#9da7b3", glyph: "鉄", base: "ゴーレム" },
-  { id: "mana", name: "魔力", color: "#76d7ff", glyph: "魔", base: "ウィスプ" },
-  { id: "mushroom", name: "毒茸", color: "#b78aff", glyph: "毒", base: "スライム" },
-  { id: "soul", name: "魂火", color: "#ff738f", glyph: "魂", base: "インプ" }
+  { id: "bone", name: "骨", color: "#e8dcc0", base: "スケルトン" },
+  { id: "fang", name: "牙", color: "#f2b36d", base: "魔獣" },
+  { id: "iron", name: "鉄", color: "#9da7b3", base: "ゴーレム" },
+  { id: "mana", name: "魔力", color: "#76d7ff", base: "ウィスプ" },
+  { id: "mushroom", name: "毒茸", color: "#b78aff", base: "スライム" },
+  { id: "soul", name: "魂火", color: "#ff738f", base: "インプ" }
 ];
 
 const BASE_STATS = {
@@ -203,7 +203,6 @@ function summonSpec(ids, terrainId, elapsed, nearKing, difficultyId) {
   const hardMode = difficultySettings(difficultyId).id === "hard";
   const terrainAffinity = hasHardTerrainAffinity(primary, terrainId);
   stats.hardPrepared = false;
-  stats.terrainAffinity = terrainAffinity;
   if (hardMode) {
     const recipeBoost = ids.length === 1 ? 0.82 : ids.length === 2 ? 1.06 : 1.2;
     stats.hp *= recipeBoost;
@@ -227,7 +226,6 @@ function summonSpec(ids, terrainId, elapsed, nearKing, difficultyId) {
   stats.name = recipeName(ids);
   stats.tier = tier;
   stats.primary = primary;
-  stats.ingredients = ids.slice();
   return stats;
 }
 

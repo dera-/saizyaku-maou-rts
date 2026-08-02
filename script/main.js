@@ -19,11 +19,11 @@ exports.main = function main(param) {
     game: g.game,
     assetIds: [
       "sprites", "field",
-      "font15Image", "font15Glyphs",
-      "font20Image", "font20Glyphs",
+      "font18Image", "font18Glyphs",
       "font24Image", "font24Glyphs",
-      "font32Image", "font32Glyphs",
-      "font44Image", "font44Glyphs"
+      "font28Image", "font28Glyphs",
+      "font36Image", "font36Glyphs",
+      "font48Image", "font48Glyphs"
     ]
   });
   const random = param.random || g.game.random;
@@ -47,11 +47,13 @@ exports.main = function main(param) {
         glyphInfo: JSON.parse(scene.asset.getTextContentById(glyphId))
       });
     }
-    const font12 = loadBitmapFont("font15Image", "font15Glyphs");
-    const font16 = loadBitmapFont("font20Image", "font20Glyphs");
-    const font20 = loadBitmapFont("font24Image", "font24Glyphs");
-    const font28 = loadBitmapFont("font32Image", "font32Glyphs");
-    const font42 = loadBitmapFont("font44Image", "font44Glyphs");
+    // 1280x720のゲーム画面をスマートフォンへ縮小しても読めるよう、
+    // UI用途ごとに18px以上のアンチエイリアス付きBitmapFontを使う。
+    const font12 = loadBitmapFont("font18Image", "font18Glyphs");
+    const font16 = loadBitmapFont("font24Image", "font24Glyphs");
+    const font20 = loadBitmapFont("font28Image", "font28Glyphs");
+    const font28 = loadBitmapFont("font36Image", "font36Glyphs");
+    const font42 = loadBitmapFont("font48Image", "font48Glyphs");
     const spriteAtlas = scene.asset.getImageById("sprites");
     const fieldImage = scene.asset.getImageById("field");
     const ATLAS_CELL = 256;
@@ -277,11 +279,11 @@ exports.main = function main(param) {
     const kingHpBar = new g.FilledRect({ scene, x: KING_HP_BAR_X, y: 15, width: 190, height: 12, cssColor: "#e95780" });
     root.append(kingHpBg); root.append(kingHpBar);
     const ruleHintBg = new g.FilledRect({
-      scene, x: W / 2 - 315, y: TOP + 5, width: 630, height: 32,
+      scene, x: W / 2 - 315, y: TOP + 5, width: 630, height: 36,
       cssColor: "#10231e", opacity: 0.82
     });
     const ruleHintLabel = new g.Label({
-      scene, x: W / 2, y: TOP + 10, anchorX: 0.5, font: font16,
+      scene, x: W / 2, y: TOP + 9, anchorX: 0.5, font: font16,
       text: "触媒を拾う → 画面下で選ぶ → フィールドタップで召喚", textColor: "#fff0a5"
     });
     root.append(ruleHintBg); root.append(ruleHintLabel);
@@ -372,11 +374,11 @@ exports.main = function main(param) {
     const enemyRows = [];
     const allyRows = [];
     for (let i = 0; i < 4; ++i) {
-      const label = new g.Label({ scene, x: 20, y: TOP + 72 + i * 22, width: 310, font: font12, text: "", textColor: "#e4d8d4" });
+      const label = new g.Label({ scene, x: 20, y: TOP + 76 + i * 26, width: 310, font: font12, text: "", textColor: "#e4d8d4" });
       enemyRows.push(label); root.append(label);
     }
     for (let i = 0; i < 7; ++i) {
-      const label = new g.Label({ scene, x: W - 430, y: TOP + 72 + i * 22, width: 412, font: font12, text: "", textColor: "#d8eee0" });
+      const label = new g.Label({ scene, x: W - 430, y: TOP + 76 + i * 26, width: 412, font: font12, text: "", textColor: "#d8eee0" });
       allyRows.push(label); root.append(label);
     }
     const forcePanelEntities = [enemyPanel, allyPanel, enemyTitle, allyTitle, ...enemyRows, ...allyRows];
@@ -417,7 +419,7 @@ exports.main = function main(param) {
       const count = new g.Label({ scene, x: x + 58, y: y + 43, anchorX: 0.5, font: font20, text: "×1", textColor: "#ffffff" });
       const lock = new g.Label({ scene, x: x + 105, y: y + 64, anchorX: 1, font: font12, text: "", textColor: "#ff9b9b" });
       root.append(base); root.append(strip); root.append(glyph); root.append(name); root.append(count); root.append(lock);
-      const button = { cat, base, strip, glyph, name, count, lock, x, y };
+      const button = { cat, base, strip, glyph, name, count, lock };
       buttons.push(button);
 
       base.onPointDown.add(() => {
@@ -750,7 +752,7 @@ exports.main = function main(param) {
       const enemyCounts = {};
       enemies.forEach((enemy) => { enemyCounts[enemy.name] = (enemyCounts[enemy.name] || 0) + 1; });
       const enemyParts = Object.keys(enemyCounts).map((name) => name + "×" + enemyCounts[name]);
-      const enemyPanelHeight = 50 + Math.ceil(enemyParts.length / 2) * 22;
+      const enemyPanelHeight = 54 + Math.ceil(enemyParts.length / 2) * 26;
       if (enemyPanel.height !== enemyPanelHeight) {
         enemyPanel.height = enemyPanelHeight;
         enemyPanel.modified();
@@ -771,7 +773,7 @@ exports.main = function main(param) {
       });
       const allyGroups = Object.keys(groups).map((key) => groups[key]);
       const visibleAllyRows = Math.min(7, allyGroups.length > 6 ? 7 : allyGroups.length);
-      const allyPanelHeight = 50 + visibleAllyRows * 22;
+      const allyPanelHeight = 54 + visibleAllyRows * 26;
       if (allyPanel.height !== allyPanelHeight) {
         allyPanel.height = allyPanelHeight;
         allyPanel.modified();
@@ -811,7 +813,7 @@ exports.main = function main(param) {
       unitLayer.append(body); unitLayer.append(hpBg); unitLayer.append(hpBar);
       minions.push({
         ...spec, x, y, hp: spec.hp, maxHp: spec.hp, body, hpBg, hpBar,
-        attackLeft: random.generate() * 0.4, age: 0, poisonTick: 0, id: summonSerial
+        attackLeft: random.generate() * 0.4, id: summonSerial
       });
       playSe("summonSe", 0.72, 0.1);
       burst(x, y, spec.color, 6);
@@ -1083,7 +1085,6 @@ exports.main = function main(param) {
     function updateMinions(dt) {
       for (let i = minions.length - 1; i >= 0; --i) {
         const m = minions[i];
-        m.age += dt;
         m.attackLeft -= dt;
         let targetInfo = nearest(m, enemies);
         if (m.tactic === "guard" && Logic.distance(m, king) > 150) {

@@ -35,25 +35,15 @@
 			"width": 1280,
 			"height": 720
 		},
-		"font15Image": {
+		"font18Image": {
 			"type": "image",
-			"path": "assets/font/pixelmplus-15.png",
+			"path": "assets/font/pixelmplus-18.png",
 			"width": 512,
-			"height": 208
+			"height": 312
 		},
-		"font15Glyphs": {
+		"font18Glyphs": {
 			"type": "text",
-			"path": "assets/font/pixelmplus-15.json"
-		},
-		"font20Image": {
-			"type": "image",
-			"path": "assets/font/pixelmplus-20.png",
-			"width": 512,
-			"height": 344
-		},
-		"font20Glyphs": {
-			"type": "text",
-			"path": "assets/font/pixelmplus-20.json"
+			"path": "assets/font/pixelmplus-18.json"
 		},
 		"font24Image": {
 			"type": "image",
@@ -65,25 +55,35 @@
 			"type": "text",
 			"path": "assets/font/pixelmplus-24.json"
 		},
-		"font32Image": {
+		"font28Image": {
 			"type": "image",
-			"path": "assets/font/pixelmplus-bold-32.png",
+			"path": "assets/font/pixelmplus-28.png",
 			"width": 1024,
-			"height": 432
+			"height": 348
 		},
-		"font32Glyphs": {
+		"font28Glyphs": {
 			"type": "text",
-			"path": "assets/font/pixelmplus-bold-32.json"
+			"path": "assets/font/pixelmplus-28.json"
 		},
-		"font44Image": {
+		"font36Image": {
 			"type": "image",
-			"path": "assets/font/pixelmplus-bold-44.png",
+			"path": "assets/font/pixelmplus-bold-36.png",
 			"width": 1024,
-			"height": 832
+			"height": 564
 		},
-		"font44Glyphs": {
+		"font36Glyphs": {
 			"type": "text",
-			"path": "assets/font/pixelmplus-bold-44.json"
+			"path": "assets/font/pixelmplus-bold-36.json"
+		},
+		"font48Image": {
+			"type": "image",
+			"path": "assets/font/pixelmplus-bold-48.png",
+			"width": 1024,
+			"height": 956
+		},
+		"font48Glyphs": {
+			"type": "text",
+			"path": "assets/font/pixelmplus-bold-48.json"
 		},
 		"gameBgm": {
 			"type": "audio",

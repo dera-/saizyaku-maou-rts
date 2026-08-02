@@ -83,7 +83,7 @@ test("ハードは2触媒以上と適性地形の組み合わせで地形共鳴�
   const misplaced = logic.summonSpec(["iron", "bone"], "swamp", 45, false, "hard");
   const prepared = logic.summonSpec(["iron", "bone"], "rock", 45, false, "hard");
   assert.equal(logic.hardPreferredTerrain("iron"), "rock");
-  assert.equal(single.terrainAffinity, true);
+  assert.equal(logic.hasHardTerrainAffinity("iron", "rock"), true);
   assert.equal(single.hardPrepared, false);
   assert.equal(misplaced.hardPrepared, false);
   assert.equal(prepared.hardPrepared, true);
