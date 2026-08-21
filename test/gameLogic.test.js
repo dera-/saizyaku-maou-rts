@@ -6,43 +6,43 @@ const logic = require("../script/gameLogic");
 
 test("敵倍率は開始時1、終了時2.15で単調増加する", () => {
   assert.equal(logic.enemyMultiplier(0), 1);
-  assert.ok(Math.abs(logic.enemyMultiplier(180) - 2.15) < 0.0001);
-  assert.ok(logic.enemyMultiplier(120) > logic.enemyMultiplier(60));
+  assert.ok(Math.abs(logic.enemyMultiplier(140) - 2.15) < 0.0001);
+  assert.ok(logic.enemyMultiplier(95) > logic.enemyMultiplier(45));
 });
 
 test("経過時間に応じて腐敗段階が0から3まで上がる", () => {
-  assert.deepEqual([0, 44, 45, 90, 135, 180].map(logic.corruptionTier), [0, 0, 1, 2, 3, 3]);
+  assert.deepEqual([0, 34, 35, 70, 105, 140].map(logic.corruptionTier), [0, 0, 1, 2, 3, 3]);
 });
 
 test("敵の出現間隔は序盤を長く取り、段階的に短くなる", () => {
   assert.equal(logic.enemySpawnInterval(0), 6.5);
-  assert.equal(logic.enemySpawnInterval(30), 4.9);
-  assert.equal(logic.enemySpawnInterval(45), 4.35);
-  assert.equal(logic.enemySpawnInterval(60), 3.55);
-  assert.ok(logic.enemySpawnInterval(150) < 3);
-  assert.ok(logic.enemySpawnInterval(180) >= 2.45);
+  assert.equal(logic.enemySpawnInterval(24), 4.9);
+  assert.equal(logic.enemySpawnInterval(35), 4.35);
+  assert.equal(logic.enemySpawnInterval(47), 3.55);
+  assert.ok(logic.enemySpawnInterval(117) < 3);
+  assert.equal(logic.enemySpawnInterval(140), 2.45);
 });
 
-test("残り135秒から45秒の中盤は敵の追加出現率が段階的に上がる", () => {
-  assert.deepEqual([44, 45, 75, 105, 135].map(logic.enemyExtraSpawnChance), [0, 0.04, 0.08, 0.16, 0.14]);
+test("140秒の進行率に合わせて敵の追加出現率が段階的に上がる", () => {
+  assert.deepEqual([34, 35, 59, 82, 105].map(logic.enemyExtraSpawnChance), [0, 0.04, 0.08, 0.16, 0.14]);
 });
 
 test("ハードは敵の出現間隔を短縮し追加出現率と同時出現上限を増やす", () => {
-  const normal = logic.enemySpawnParameters(90, "normal");
-  const hard = logic.enemySpawnParameters(90, "hard");
-  assert.equal(normal.interval, logic.enemySpawnInterval(90));
-  assert.equal(normal.extraChance, logic.enemyExtraSpawnChance(90));
+  const normal = logic.enemySpawnParameters(70, "normal");
+  const hard = logic.enemySpawnParameters(70, "hard");
+  assert.equal(normal.interval, logic.enemySpawnInterval(70));
+  assert.equal(normal.extraChance, logic.enemyExtraSpawnChance(70));
   assert.ok(hard.interval < normal.interval);
   assert.ok(hard.extraChance > normal.extraChance);
   assert.equal(normal.maxEnemies, 42);
   assert.equal(hard.maxEnemies, 48);
 });
 
-test("軍勢コスト上限は45秒ごとに6から15まで拡張される", () => {
-  assert.deepEqual([0, 44, 45, 89, 90, 134, 135, 180].map(logic.costLimit), [6, 6, 9, 9, 12, 12, 15, 15]);
+test("軍勢コスト上限は35秒ごとに6から15まで拡張される", () => {
+  assert.deepEqual([0, 34, 35, 69, 70, 104, 105, 140].map(logic.costLimit), [6, 6, 9, 9, 12, 12, 15, 15]);
 });
 
-test("モンスターは45秒ごとに最大2倍まで強化される", () => {
+test("モンスターは35秒ごとに最大2倍まで強化される", () => {
   assert.deepEqual([0, 1, 2, 3].map(logic.monsterTierBoost), [0.88, 1.15, 1.5, 2]);
 });
 
@@ -70,7 +70,7 @@ test("代表レシピ名を解決する", () => {
 
 test("追加触媒、地形、時間が召喚性能と戦術を変える", () => {
   const early = logic.summonSpec(["bone"], "field", 0, false);
-  const late = logic.summonSpec(["bone", "iron"], "rock", 150, false);
+  const late = logic.summonSpec(["bone", "iron"], "rock", 117, false);
   assert.ok(late.hp > early.hp * 2);
   assert.ok(late.attack > early.attack);
   assert.equal(late.tactic, "guard");
@@ -79,9 +79,9 @@ test("追加触媒、地形、時間が召喚性能と戦術を変える", () =>
 });
 
 test("ハードは2触媒以上と適性地形の組み合わせで地形共鳴する", () => {
-  const single = logic.summonSpec(["iron"], "rock", 45, false, "hard");
-  const misplaced = logic.summonSpec(["iron", "bone"], "swamp", 45, false, "hard");
-  const prepared = logic.summonSpec(["iron", "bone"], "rock", 45, false, "hard");
+  const single = logic.summonSpec(["iron"], "rock", 35, false, "hard");
+  const misplaced = logic.summonSpec(["iron", "bone"], "swamp", 35, false, "hard");
+  const prepared = logic.summonSpec(["iron", "bone"], "rock", 35, false, "hard");
   assert.equal(logic.hardPreferredTerrain("iron"), "rock");
   assert.equal(logic.hasHardTerrainAffinity("iron", "rock"), true);
   assert.equal(single.hardPrepared, false);
@@ -102,7 +102,7 @@ test("ハード敵は低位召喚に強く、地形共鳴した高位召喚に�
 
 test("コンボと危険撃破でスコアが増える", () => {
   const normal = logic.scoreForKill(100, 0, 1, false);
-  const bonus = logic.scoreForKill(100, 100, 5, true);
+  const bonus = logic.scoreForKill(100, 78, 5, true);
   assert.equal(normal, 100);
   assert.ok(bonus > normal * 2);
 });

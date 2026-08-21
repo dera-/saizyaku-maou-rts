@@ -28,6 +28,8 @@ const TERRAIN = {
 };
 
 const MONSTER_TIER_BOOSTS = [0.88, 1.15, 1.5, 2];
+const GAME_TIME = 140;
+const STEP_TIME = GAME_TIME / 4;
 
 const HARD_PREFERRED_TERRAIN = {
   bone: "grave",
@@ -69,12 +71,12 @@ function resetVirtualPad(king, vector) {
 }
 
 function enemyMultiplier(elapsed) {
-  const t = clamp(elapsed / 180, 0, 1);
+  const t = clamp(elapsed / GAME_TIME, 0, 1);
   return 1 + 1.15 * Math.pow(t, 1.55);
 }
 
 function corruptionTier(elapsed) {
-  return clamp(Math.floor(elapsed / 45), 0, 3);
+  return clamp(Math.floor(elapsed / STEP_TIME), 0, 3);
 }
 
 function costLimit(elapsed) {
@@ -82,18 +84,20 @@ function costLimit(elapsed) {
 }
 
 function enemySpawnInterval(elapsed) {
-  if (elapsed < 30) return 6.5;
-  if (elapsed < 45) return 4.9;
-  if (elapsed < 60) return 4.35;
-  if (elapsed < 90) return 3.55;
-  return Math.max(2.45, 3.35 - (elapsed - 90) / 100);
+  const progress = clamp(elapsed / GAME_TIME, 0, 1);
+  if (progress < 1 / 6) return 6.5;
+  if (progress < 1 / 4) return 4.9;
+  if (progress < 1 / 3) return 4.35;
+  if (progress < 1 / 2) return 3.55;
+  return Math.max(2.45, 3.35 - ((progress - 0.5) / 0.5) * 0.9);
 }
 
 function enemyExtraSpawnChance(elapsed) {
-  if (elapsed < 45) return 0;
-  if (elapsed < 75) return 0.04;
-  if (elapsed < 105) return 0.08;
-  if (elapsed < 135) return 0.16;
+  const progress = clamp(elapsed / GAME_TIME, 0, 1);
+  if (progress < 1 / 4) return 0;
+  if (progress < 5 / 12) return 0.04;
+  if (progress < 7 / 12) return 0.08;
+  if (progress < 3 / 4) return 0.16;
   return 0.14;
 }
 
@@ -230,6 +234,7 @@ function summonSpec(ids, terrainId, elapsed, nearKing, difficultyId) {
 }
 
 module.exports = {
+  GAME_TIME,
   CATALYSTS,
   BASE_STATS,
   TERRAIN,

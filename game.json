@@ -2,10 +2,7 @@
 	"width": 1280,
 	"height": 720,
 	"fps": 30,
-	"renderers": [
-		"webgl",
-		"canvas"
-	],
+	"renderers": ["webgl", "canvas"],
 	"main": "./script/_bootstrap.js",
 	"assets": {
 		"_bootstrap": {
@@ -35,21 +32,11 @@
 			"width": 1280,
 			"height": 720
 		},
-		"font18Image": {
-			"type": "image",
-			"path": "assets/font/pixelmplus-18.png",
-			"width": 512,
-			"height": 312
-		},
-		"font18Glyphs": {
-			"type": "text",
-			"path": "assets/font/pixelmplus-18.json"
-		},
 		"font24Image": {
 			"type": "image",
 			"path": "assets/font/pixelmplus-24.png",
-			"width": 1024,
-			"height": 244
+			"width": 512,
+			"height": 488
 		},
 		"font24Glyphs": {
 			"type": "text",
@@ -59,7 +46,7 @@
 			"type": "image",
 			"path": "assets/font/pixelmplus-28.png",
 			"width": 1024,
-			"height": 348
+			"height": 316
 		},
 		"font28Glyphs": {
 			"type": "text",
@@ -215,7 +202,7 @@
 				"ranking"
 			],
 			"preferredSessionParameters": {
-				"totalTimeLimit": 200
+				"totalTimeLimit": 165
 			}
 		}
 	}

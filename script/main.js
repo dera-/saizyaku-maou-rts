@@ -1,6 +1,8 @@
 "use strict";
 
 const Logic = require("./gameLogic");
+const GAME_TIME = Logic.GAME_TIME;
+const HERO_APPEAR_TIME = GAME_TIME - 20;
 
 const AUDIO_LOAD_PLAN = [
   { id: "itemPickupSe", after: 1 },
@@ -9,9 +11,9 @@ const AUDIO_LOAD_PLAN = [
   { id: "enemyDefeatSe", after: 7 },
   { id: "monsterDeathSe", after: 9 },
   { id: "kingDeathSe", after: 11 },
-  { id: "heroAppearSe", after: 100 },
-  { id: "heroDefeatSe", after: 135 },
-  { id: "gameEndSe", after: 150 }
+  { id: "heroAppearSe", after: HERO_APPEAR_TIME - 20 },
+  { id: "heroDefeatSe", after: HERO_APPEAR_TIME + 5 },
+  { id: "gameEndSe", after: GAME_TIME - 5 }
 ];
 
 exports.main = function main(param) {
@@ -19,7 +21,6 @@ exports.main = function main(param) {
     game: g.game,
     assetIds: [
       "sprites", "field",
-      "font18Image", "font18Glyphs",
       "font24Image", "font24Glyphs",
       "font28Image", "font28Glyphs",
       "font36Image", "font36Glyphs",
@@ -34,7 +35,6 @@ exports.main = function main(param) {
     const H = g.game.height;
     const TOP = 66;
     const FIELD_BOTTOM = 596;
-    const GAME_TIME = 180;
     const MAX_PROJECTILES = 32;
     const MAX_EFFECTS = 44;
     const MAX_FLOATING_LABELS = 6;
@@ -47,9 +47,8 @@ exports.main = function main(param) {
         glyphInfo: JSON.parse(scene.asset.getTextContentById(glyphId))
       });
     }
-    // 1280x720のゲーム画面をスマートフォンへ縮小しても読めるよう、
-    // UI用途ごとに18px以上のアンチエイリアス付きBitmapFontを使う。
-    const font12 = loadBitmapFont("font18Image", "font18Glyphs");
+    // 375x211相当へ縮小されても主要情報を読めるよう、本文は原則28px以上、
+    // 情報量の多い勢力詳細でも24px以上のBitmapFontを使う。
     const font16 = loadBitmapFont("font24Image", "font24Glyphs");
     const font20 = loadBitmapFont("font28Image", "font28Glyphs");
     const font28 = loadBitmapFont("font36Image", "font36Glyphs");
@@ -195,36 +194,55 @@ exports.main = function main(param) {
     root.append(new g.Sprite({ scene, src: fieldImage, x: 0, y: 0, width: W, height: H, opacity: 0.9 }));
 
     const terrains = [
-      { id: "road", x: 0, y: 292, width: W, height: 84 },
-      { id: "rock", x: 82, y: 92, width: 244, height: 142 },
-      { id: "mana", x: 478, y: 120, width: 284, height: 128 },
-      { id: "swamp", x: 886, y: 398, width: 260, height: 154 },
-      { id: "grave", x: 128, y: 420, width: 250, height: 130 }
+      { id: "road", x: 0, y: 292, width: W, height: 92 },
+      { id: "rock", x: 60, y: 80, width: 300, height: 185 },
+      { id: "mana", x: 445, y: 100, width: 350, height: 170 },
+      { id: "swamp", x: 850, y: 386, width: 330, height: 180 },
+      { id: "grave", x: 90, y: 398, width: 330, height: 165 }
     ];
 
+    const terrainLabelLayouts = {
+      road: { x: 820, y: 298, width: 340, effect: "移動+18%／遊撃" },
+      rock: { x: 92, y: 202, width: 230, effect: "HP+25%／護衛" },
+      mana: { x: 478, y: 126, width: 310, effect: "攻撃+22%／射程UP" },
+      swamp: { x: 884, y: 406, width: 280, effect: "毒付与／攻撃+12%" },
+      grave: { x: 120, y: 428, width: 280, effect: "骨/魂 HP/攻+22%" }
+    };
     const terrainViews = [];
     terrains.forEach((zone) => {
       const info = Logic.TERRAIN[zone.id];
-      const labelX = zone.x + (zone.id === "road" ? 44 : 8);
-      const labelY = zone.id === "rock" ? zone.y - 16 : zone.y + 6;
-      const labelWidth = zone.width - (zone.id === "road" ? 52 : 16);
+      const layout = terrainLabelLayouts[zone.id];
       const rect = new g.FilledRect({
         scene, x: zone.x, y: zone.y, width: zone.width, height: zone.height,
         cssColor: info.color, opacity: 0.18
       });
-      const label = new g.Label({
-        scene, x: labelX, y: labelY, width: labelWidth,
-        font: font12, text: info.name + "：" + info.effect,
-        textColor: "#eef8f3", opacity: 0.86
+      const labelBg = new g.FilledRect({
+        scene, x: layout.x, y: layout.y, width: layout.width, height: 62,
+        cssColor: "#07110f", opacity: 0.48
+      });
+      const nameLabel = new g.Label({
+        scene, x: layout.x + 8, y: layout.y + 3, width: layout.width - 16,
+        font: font20, text: info.name, textColor: "#e9d991", opacity: 0.86
+      });
+      const effectLabel = new g.Label({
+        scene, x: layout.x + 8, y: layout.y + 32, width: layout.width - 16,
+        font: font20, text: layout.effect, textColor: "#e5ebe8", opacity: 0.82
       });
       root.append(rect);
-      root.append(label);
-      terrainViews.push({ zone, rect, label });
+      root.append(labelBg);
+      root.append(nameLabel);
+      root.append(effectLabel);
+      terrainViews.push({ zone, rect, labelBg, nameLabel, effectLabel });
+    });
+    const fieldEffectBg = new g.FilledRect({
+      scene, x: 8, y: FIELD_BOTTOM - 50, width: 344, height: 40,
+      cssColor: "#07110f", opacity: 0.5
     });
     const fieldEffectLabel = new g.Label({
-      scene, x: 12, y: FIELD_BOTTOM - 20, width: 360, font: font12,
-      text: "平地：魔王付近なら護衛型", textColor: "#dcebe5", opacity: 0.82
+      scene, x: 16, y: FIELD_BOTTOM - 44, width: 328, font: font20,
+      text: "平地：魔王付近で護衛型", textColor: "#d9e2de", opacity: 0.86
     });
+    root.append(fieldEffectBg);
     root.append(fieldEffectLabel);
 
     const gates = [
@@ -264,33 +282,30 @@ exports.main = function main(param) {
     root.append(scoreLabel);
     const timeLabel = new g.Label({ scene, x: W / 2, y: 0, anchorX: 0.5, font: font42, text: "180", textColor: "#ffffff" });
     root.append(timeLabel);
-    const phaseLabel = new g.Label({ scene, x: W / 2, y: 48, anchorX: 0.5, font: font12, text: "準備", textColor: "#8ee6c3" });
-    root.append(phaseLabel);
     const TOP_STATUS_SHIFT_X = 88;
     const TOP_STATUS_RIGHT = W - 18 - TOP_STATUS_SHIFT_X;
-    const statusLabel = new g.Label({ scene, x: TOP_STATUS_RIGHT, y: 10, anchorX: 1, font: font16, text: "軍勢 0/6  死亡 0", textColor: "#d8e3df" });
+    const statusLabel = new g.Label({ scene, x: TOP_STATUS_RIGHT, y: 7, anchorX: 1, font: font20, text: "死亡 0", textColor: "#d8e3df" });
     root.append(statusLabel);
-    const comboLabel = new g.Label({ scene, x: W - 260, y: 35, anchorX: 1, font: font20, text: "", textColor: "#ffd064" });
+    const comboLabel = new g.Label({ scene, x: W / 2 + 150, y: 35, anchorX: 0.5, font: font20, text: "", textColor: "#ffd064" });
     root.append(comboLabel);
-    const kingHpLabel = new g.Label({ scene, x: TOP_STATUS_RIGHT, y: 34, anchorX: 1, font: font16, text: "魔王HP 50/50", textColor: "#ffb2c9" });
+    const kingHpLabel = new g.Label({ scene, x: TOP_STATUS_RIGHT, y: 36, anchorX: 1, font: font20, text: "魔王HP 50/50", textColor: "#ffb2c9" });
     root.append(kingHpLabel);
     const KING_HP_BAR_X = W - 430 - TOP_STATUS_SHIFT_X;
     const kingHpBg = new g.FilledRect({ scene, x: KING_HP_BAR_X, y: 15, width: 190, height: 12, cssColor: "#3d2630" });
     const kingHpBar = new g.FilledRect({ scene, x: KING_HP_BAR_X, y: 15, width: 190, height: 12, cssColor: "#e95780" });
     root.append(kingHpBg); root.append(kingHpBar);
     const ruleHintBg = new g.FilledRect({
-      scene, x: W / 2 - 315, y: TOP + 5, width: 630, height: 36,
+      scene, x: W / 2 - 360, y: TOP + 5, width: 720, height: 40,
       cssColor: "#10231e", opacity: 0.82
     });
     const ruleHintLabel = new g.Label({
-      scene, x: W / 2, y: TOP + 9, anchorX: 0.5, font: font16,
-      text: "触媒を拾う → 画面下で選ぶ → フィールドタップで召喚", textColor: "#fff0a5"
+      scene, x: W / 2, y: TOP + 10, anchorX: 0.5, font: font20,
+      text: "触媒を拾う → 触媒を選ぶ → フィールドをタップ", textColor: "#fff0a5"
     });
     root.append(ruleHintBg); root.append(ruleHintLabel);
 
     const inventoryPanel = new g.FilledRect({ scene, x: 0, y: FIELD_BOTTOM, width: W, height: H - FIELD_BOTTOM, cssColor: "#0b1513" });
     root.append(inventoryPanel);
-    root.append(new g.Label({ scene, x: 12, y: FIELD_BOTTOM + 5, font: font12, text: "触媒を1～3個選び、フィールドの召喚地点をタップ", textColor: "#b9c9c3" }));
 
     let elapsed = 0;
     let phase = "ready";
@@ -338,58 +353,75 @@ exports.main = function main(param) {
     };
     const kingBody = atlasSprite(0, 0, king.x - 28, king.y - 28, 56, 56, false);
     root.append(kingBody);
-    const kingCrown = new g.Label({ scene, x: king.x, y: king.y - 31, anchorX: 0.5, font: font16, text: "魔王", textColor: "#ffe4a6" });
+    const kingCrown = new g.Label({ scene, x: king.x, y: king.y - 35, anchorX: 0.5, font: font20, text: "魔王", textColor: "#ffe4a6" });
     root.append(kingCrown);
 
     const inventoryGuideBorders = [
-      new g.FilledRect({ scene, x: 6, y: FIELD_BOTTOM + 22, width: 722, height: 4, cssColor: "#ffe56a" }),
-      new g.FilledRect({ scene, x: 6, y: FIELD_BOTTOM + 108, width: 722, height: 4, cssColor: "#ffe56a" }),
-      new g.FilledRect({ scene, x: 6, y: FIELD_BOTTOM + 22, width: 4, height: 90, cssColor: "#ffe56a" }),
-      new g.FilledRect({ scene, x: 724, y: FIELD_BOTTOM + 22, width: 4, height: 90, cssColor: "#ffe56a" })
+      new g.FilledRect({ scene, x: 6, y: FIELD_BOTTOM + 5, width: 722, height: 4, cssColor: "#ffe56a" }),
+      new g.FilledRect({ scene, x: 6, y: FIELD_BOTTOM + 117, width: 722, height: 4, cssColor: "#ffe56a" }),
+      new g.FilledRect({ scene, x: 6, y: FIELD_BOTTOM + 5, width: 4, height: 116, cssColor: "#ffe56a" }),
+      new g.FilledRect({ scene, x: 724, y: FIELD_BOTTOM + 5, width: 4, height: 116, cssColor: "#ffe56a" })
     ];
     inventoryGuideBorders.forEach((border) => root.append(border));
-    const selectionLabel = new g.Label({ scene, x: 770, y: FIELD_BOTTOM + 5, font: font12, text: "", textColor: "#ffffff" });
+    const selectionSummaryBg = new g.FilledRect({
+      scene, x: 744, y: FIELD_BOTTOM + 6, width: 408, height: 112,
+      cssColor: "#142a24", opacity: 0.96
+    });
+    const selectionSummaryAccent = new g.FilledRect({
+      scene, x: 744, y: FIELD_BOTTOM + 6, width: 7, height: 112,
+      cssColor: "#8ee6c3"
+    });
+    root.append(selectionSummaryBg);
+    root.append(selectionSummaryAccent);
+    const selectionLabel = new g.Label({ scene, x: 760, y: FIELD_BOTTOM + 10, width: 382, font: font20, text: "", textColor: "#fff0a5" });
     root.append(selectionLabel);
-    const previewLabel = new g.Label({ scene, x: 770, y: FIELD_BOTTOM + 26, width: 390, font: font16, text: "", textColor: "#8ee6c3" });
+    const previewLabel = new g.Label({ scene, x: 760, y: FIELD_BOTTOM + 43, width: 382, font: font20, text: "", textColor: "#ffffff" });
     root.append(previewLabel);
-    const toastLabel = new g.Label({ scene, x: W / 2, y: FIELD_BOTTOM - 44, anchorX: 0.5, font: font20, text: "", textColor: "#fff0a5", hidden: true });
+    const previewSubLabel = new g.Label({ scene, x: 760, y: FIELD_BOTTOM + 76, width: 382, font: font20, text: "", textColor: "#8ee6c3" });
+    root.append(previewSubLabel);
+    const toastBg = new g.FilledRect({
+      scene, x: W / 2 - 370, y: FIELD_BOTTOM - 96, width: 740, height: 42,
+      cssColor: "#10231e", opacity: 0.82, hidden: true
+    });
+    const toastLabel = new g.Label({ scene, x: W / 2, y: FIELD_BOTTOM - 89, anchorX: 0.5, font: font20, text: "", textColor: "#fff0a5", hidden: true });
+    root.append(toastBg);
     root.append(toastLabel);
     const pauseBanner = new g.FilledRect({
-      scene, x: 350, y: TOP + 94, width: 480, height: 42,
+      scene, x: 350, y: TOP + 5, width: 480, height: 42,
       cssColor: "#5c4618", opacity: 0.9, hidden: true
     });
     root.append(pauseBanner);
     const pauseIndicator = new g.Label({
-      scene, x: 590, y: TOP + 103, anchorX: 0.5, font: font20,
+      scene, x: 590, y: TOP + 12, anchorX: 0.5, font: font20,
       text: "", textColor: "#fff0a5", hidden: true
     });
     root.append(pauseIndicator);
 
     const enemyPanel = new g.FilledRect({ scene, x: 10, y: TOP + 38, width: 330, height: 48, cssColor: "#1a2024", opacity: 0.64 });
-    const allyPanel = new g.FilledRect({ scene, x: W - 440, y: TOP + 38, width: 430, height: 48, cssColor: "#17241f", opacity: 0.68 });
+    const allyPanel = new g.FilledRect({ scene, x: W - 500, y: TOP + 38, width: 490, height: 48, cssColor: "#17241f", opacity: 0.68 });
     root.append(enemyPanel); root.append(allyPanel);
-    const enemyTitle = new g.Label({ scene, x: 20, y: TOP + 45, font: font16, text: "敵勢力 0", textColor: "#ffb0a4" });
-    const allyTitle = new g.Label({ scene, x: W - 430, y: TOP + 45, font: font16, text: "味方勢力 0/6", textColor: "#9cf0ba" });
+    const enemyTitle = new g.Label({ scene, x: 20, y: TOP + 45, font: font20, text: "敵勢力 0", textColor: "#ffb0a4" });
+    const allyTitle = new g.Label({ scene, x: W - 490, y: TOP + 45, font: font20, text: "味方勢力 0/6", textColor: "#9cf0ba" });
     root.append(enemyTitle); root.append(allyTitle);
     const enemyRows = [];
     const allyRows = [];
     for (let i = 0; i < 4; ++i) {
-      const label = new g.Label({ scene, x: 20, y: TOP + 76 + i * 26, width: 310, font: font12, text: "", textColor: "#e4d8d4" });
+      const label = new g.Label({ scene, x: 20, y: TOP + 82 + i * 30, width: 310, font: font16, text: "", textColor: "#ffffff" });
       enemyRows.push(label); root.append(label);
     }
     for (let i = 0; i < 7; ++i) {
-      const label = new g.Label({ scene, x: W - 430, y: TOP + 76 + i * 26, width: 412, font: font12, text: "", textColor: "#d8eee0" });
+      const label = new g.Label({ scene, x: W - 490, y: TOP + 82 + i * 30, width: 472, font: font16, text: "", textColor: "#ffffff" });
       allyRows.push(label); root.append(label);
     }
     const forcePanelEntities = [enemyPanel, allyPanel, enemyTitle, allyTitle, ...enemyRows, ...allyRows];
     let forcePanelsVisible = true;
     const forceToggleButton = new g.FilledRect({
-      scene, x: W - 172, y: TOP + 5, width: 162, height: 30,
+      scene, x: W - 188, y: TOP + 5, width: 178, height: 40,
       cssColor: "#315b4b", opacity: 0.94, touchable: true
     });
     const forceToggleLabel = new g.Label({
-      scene, x: W - 91, y: TOP + 10, anchorX: 0.5,
-      font: font12, text: "勢力表示 ON", textColor: "#ffffff"
+      scene, x: W - 99, y: TOP + 10, anchorX: 0.5,
+      font: font20, text: "勢力表示 ON", textColor: "#ffffff"
     });
     root.append(forceToggleButton);
     root.append(forceToggleLabel);
@@ -410,14 +442,14 @@ exports.main = function main(param) {
     const buttons = [];
     Logic.CATALYSTS.forEach((cat, i) => {
       const x = 10 + i * 121;
-      const y = FIELD_BOTTOM + 27;
-      const base = new g.FilledRect({ scene, x, y, width: 111, height: 82, cssColor: "#24312e", touchable: true });
-      const strip = new g.FilledRect({ scene, x, y, width: 8, height: 82, cssColor: cat.color });
+      const y = FIELD_BOTTOM + 10;
+      const base = new g.FilledRect({ scene, x, y, width: 111, height: 104, cssColor: "#24312e", touchable: true });
+      const strip = new g.FilledRect({ scene, x, y, width: 8, height: 104, cssColor: cat.color });
       const cell = catalystCell(cat.id);
-      const glyph = atlasSprite(cell.col, cell.row, x + 10, y + 4, 48, 48, false);
-      const name = new g.Label({ scene, x: x + 58, y: y + 9, anchorX: 0.5, font: font16, text: cat.name, textColor: "#ffffff" });
-      const count = new g.Label({ scene, x: x + 58, y: y + 43, anchorX: 0.5, font: font20, text: "×1", textColor: "#ffffff" });
-      const lock = new g.Label({ scene, x: x + 105, y: y + 64, anchorX: 1, font: font12, text: "", textColor: "#ff9b9b" });
+      const glyph = atlasSprite(cell.col, cell.row, x + 8, y + 4, 50, 50, false);
+      const name = new g.Label({ scene, x: x + 63, y: y + 5, anchorX: 0.5, font: font20, text: cat.name, textColor: "#ffffff" });
+      const count = new g.Label({ scene, x: x + 58, y: y + 47, anchorX: 0.5, font: font28, text: "×1", textColor: "#ffffff" });
+      const lock = new g.Label({ scene, x: x + 105, y: y + 79, anchorX: 1, font: font16, text: "", textColor: "#ff9b9b" });
       root.append(base); root.append(strip); root.append(glyph); root.append(name); root.append(count); root.append(lock);
       const button = { cat, base, strip, glyph, name, count, lock };
       buttons.push(button);
@@ -446,8 +478,8 @@ exports.main = function main(param) {
       width: MOBILE_CONTROL_SIZE, height: 58, cssColor: "#704653", touchable: true
     });
     const clearButtonLabel = new g.Label({
-      scene, x: MOBILE_CONTROL_X + MOBILE_CONTROL_SIZE / 2, y: MOBILE_CONTROL_Y + 40,
-      anchorX: 0.5, font: font16, text: "選択解除", textColor: "#ffffff"
+      scene, x: MOBILE_CONTROL_X + MOBILE_CONTROL_SIZE / 2, y: MOBILE_CONTROL_Y + 37,
+      anchorX: 0.5, font: font20, text: "選択解除", textColor: "#ffffff"
     });
     clearButtonGroup.append(clearButton);
     clearButtonGroup.append(clearButtonLabel);
@@ -499,8 +531,8 @@ exports.main = function main(param) {
       width: 34, height: 34, cssColor: "#e7b75d", opacity: 0.82, hidden: true
     });
     const padLabel = new g.Label({
-      scene, x: PAD_X + PAD_CENTER, y: PAD_Y + PAD_CENTER - 6, anchorX: 0.5,
-      font: font12, text: "MOVE", textColor: "#15201d", hidden: true
+      scene, x: PAD_X + PAD_CENTER, y: PAD_Y + PAD_CENTER - 10, anchorX: 0.5,
+      font: font16, text: "MOVE", textColor: "#15201d", hidden: true
     });
     const padInput = new g.FilledRect({
       scene, x: PAD_X, y: PAD_Y, width: PAD_SIZE, height: PAD_SIZE,
@@ -562,14 +594,6 @@ exports.main = function main(param) {
       return "field";
     }
 
-    function phaseName() {
-      if (elapsed < 45) return "準備：通常体";
-      if (elapsed < 90) return "混戦：強化体";
-      if (elapsed < 135) return "包囲：変異体";
-      if (elapsed < 160) return "勇者前衛隊：最終形態";
-      return "勇者襲来";
-    }
-
     function currentCost() {
       let total = 0;
       for (let i = 0; i < minions.length; ++i) total += minions[i].cost;
@@ -623,13 +647,14 @@ exports.main = function main(param) {
       return awarded;
     }
 
-    function showToast(text, color) {
+    function showToast(text, color, duration) {
       toastLabel.text = text;
       toastLabel.textColor = color || "#fff0a5";
+      setEntityVisible(toastBg, true);
       setEntityVisible(toastLabel, true);
       toastLabel.invalidate();
       toastLabel.modified();
-      toastLeft = 1.6;
+      toastLeft = duration == null ? 1.6 : duration;
     }
 
     function refreshInventory() {
@@ -637,8 +662,9 @@ exports.main = function main(param) {
         const used = selected.filter((id) => id === b.cat.id).length;
         const canAdd = canAddCatalyst(b.cat.id);
         const costLocked = selected.length + 1 > remainingCost();
-        b.count.text = "×" + inventory[b.cat.id] + (used ? "  選" + used : "");
-        b.lock.text = costLocked && !used ? "上限" : "";
+        b.count.text = "×" + inventory[b.cat.id];
+        b.lock.text = used ? "選" + used : costLocked ? "上限" : "";
+        b.lock.textColor = used ? "#fff0a5" : "#ff9b9b";
         b.count.textColor = used ? "#fff0a5" : canAdd ? "#ffffff" : "#78847f";
         b.count.invalidate();
         b.lock.invalidate();
@@ -653,24 +679,32 @@ exports.main = function main(param) {
         b.name.modified();
       });
       const names = selected.map((id) => Logic.CATALYSTS.find((c) => c.id === id).name);
-      selectionLabel.text = names.length ? "選択中: " + names.join(" + ") : remainingCost() > 0 ? "" : "軍勢上限：召喚できません";
+      selectionLabel.text = names.length ? "選択：" + names.join("＋") : remainingCost() > 0 ? "" : "軍勢上限です";
       selectionLabel.invalidate();
     }
 
     function updateSelectionPreview() {
       if (!selected.length) {
-        previewLabel.text = remainingCost() > 0 ? "光っている触媒ボタンをタップ" : "味方の撃破か次の上限拡張を待ってください";
+        if (remainingCost() > 0) {
+          previewLabel.text = "光っている触媒を";
+          previewSubLabel.text = "1～3個選択";
+        } else {
+          previewLabel.text = "";
+          previewSubLabel.text = "";
+        }
       } else {
         const spec = Logic.summonSpec(selected, "field", elapsed, false, difficultyId);
+        previewLabel.text = "召喚：" + spec.name;
         if (difficultyId === "hard") {
           const preferred = Logic.hardPreferredTerrain(spec.primary);
           const rankHint = selected.length >= 2 ? "★共鳴可能" : "2触媒以上で共鳴";
-          previewLabel.text = spec.name + "　適性：" + Logic.TERRAIN[preferred].name + "（" + rankHint + "）";
+          previewSubLabel.text = "適性：" + Logic.TERRAIN[preferred].name + "　" + rankHint;
         } else {
-          previewLabel.text = spec.name;
+          previewSubLabel.text = "召喚地点をタップ";
         }
       }
       previewLabel.invalidate();
+      previewSubLabel.invalidate();
     }
 
     let summonGuidanceState = "";
@@ -712,12 +746,16 @@ exports.main = function main(param) {
         terrainViews.forEach((view) => {
           const info = Logic.TERRAIN[view.zone.id];
           const affinity = choosing && difficultyId === "hard" && Logic.hasHardTerrainAffinity(selected[0], view.zone.id);
-          setLabelText(view.label, info.name + "：" + info.effect + (affinity ? " ★適性" : ""));
-          view.rect.opacity = choosing ? 0.42 : 0.18;
+          setLabelText(view.nameLabel, info.name + (affinity ? " ★適性" : ""));
+          view.rect.opacity = choosing ? 0.34 : 0.14;
           view.rect.cssColor = affinity ? "#8a7024" : info.color;
-          view.label.opacity = choosing ? 1 : 0.86;
+          view.labelBg.opacity = choosing ? 0.72 : 0.48;
+          view.nameLabel.opacity = choosing ? 1 : 0.86;
+          view.effectLabel.opacity = choosing ? 0.96 : 0.82;
           view.rect.modified();
-          view.label.modified();
+          view.labelBg.modified();
+          view.nameLabel.modified();
+          view.effectLabel.modified();
         });
       }
       setVirtualPadVisible(padVisible);
@@ -725,12 +763,12 @@ exports.main = function main(param) {
     }
 
     function tacticName(id) {
-      const names = { guard: "魔王護衛", execute: "各個撃破", skirmish: "遊撃", collect: "収集", cautious: "慎重", raid: "強襲" };
+      const names = { guard: "護衛", execute: "撃破", skirmish: "遊撃", collect: "収集", cautious: "慎重", raid: "強襲" };
       return names[id] || id;
     }
 
     function speciesName(primary) {
-      const names = { bone: "骨族", fang: "魔獣族", iron: "鉱石族", mana: "精霊族", mushroom: "粘体族", soul: "魔族" };
+      const names = { bone: "骨", fang: "魔獣", iron: "鉱石", mana: "精霊", mushroom: "粘体", soul: "魔" };
       return names[primary] || "不明";
     }
 
@@ -752,7 +790,7 @@ exports.main = function main(param) {
       const enemyCounts = {};
       enemies.forEach((enemy) => { enemyCounts[enemy.name] = (enemyCounts[enemy.name] || 0) + 1; });
       const enemyParts = Object.keys(enemyCounts).map((name) => name + "×" + enemyCounts[name]);
-      const enemyPanelHeight = 54 + Math.ceil(enemyParts.length / 2) * 26;
+      const enemyPanelHeight = 62 + Math.ceil(enemyParts.length / 2) * 30;
       if (enemyPanel.height !== enemyPanelHeight) {
         enemyPanel.height = enemyPanelHeight;
         enemyPanel.modified();
@@ -773,7 +811,7 @@ exports.main = function main(param) {
       });
       const allyGroups = Object.keys(groups).map((key) => groups[key]);
       const visibleAllyRows = Math.min(7, allyGroups.length > 6 ? 7 : allyGroups.length);
-      const allyPanelHeight = 54 + visibleAllyRows * 26;
+      const allyPanelHeight = 62 + visibleAllyRows * 30;
       if (allyPanel.height !== allyPanelHeight) {
         allyPanel.height = allyPanelHeight;
         allyPanel.modified();
@@ -783,7 +821,7 @@ exports.main = function main(param) {
         if (index < 6 && allyGroups[index]) {
           const group = allyGroups[index];
           const countText = group.count > 1 ? "×" + group.count : "";
-          text = (group.prepared ? "★" : "") + group.name.slice(0, 11) + countText + " T" + (group.tier + 1) + " HP" + Math.ceil(group.hp) + "/" + group.maxHp + "  " + speciesName(group.primary) + "/" + tacticName(group.tactic);
+          text = (group.prepared ? "★" : "") + group.name.slice(0, 11) + countText + " HP" + Math.ceil(group.hp) + "/" + group.maxHp + " " + speciesName(group.primary) + "/" + tacticName(group.tactic);
         } else if (index === 6 && allyGroups.length > 6) {
           text = "ほか " + (allyGroups.length - 6) + "編成";
         }
@@ -879,10 +917,11 @@ exports.main = function main(param) {
 
     function chooseEnemyType() {
       const r = random.generate();
-      if (elapsed < 30) return r < 0.9 ? "fighter" : "rogue";
-      if (elapsed < 45) return r < 0.82 ? "fighter" : "rogue";
-      if (elapsed < 90) return r < 0.42 ? "fighter" : r < 0.68 ? "rogue" : r < 0.88 ? "archer" : "cleric";
-      if (elapsed < 135) return r < 0.27 ? "fighter" : r < 0.47 ? "rogue" : r < 0.7 ? "archer" : r < 0.84 ? "cleric" : "knight";
+      const progress = elapsed / GAME_TIME;
+      if (progress < 1 / 6) return r < 0.9 ? "fighter" : "rogue";
+      if (progress < 1 / 4) return r < 0.82 ? "fighter" : "rogue";
+      if (progress < 1 / 2) return r < 0.42 ? "fighter" : r < 0.68 ? "rogue" : r < 0.88 ? "archer" : "cleric";
+      if (progress < 3 / 4) return r < 0.27 ? "fighter" : r < 0.47 ? "rogue" : r < 0.7 ? "archer" : r < 0.84 ? "cleric" : "knight";
       return r < 0.18 ? "rogue" : r < 0.4 ? "archer" : r < 0.58 ? "cleric" : "knight";
     }
 
@@ -1384,7 +1423,7 @@ exports.main = function main(param) {
       root.append(overlay);
       root.append(new g.Label({ scene, x: W / 2, y: 150, anchorX: 0.5, font: font42, text: "防衛戦終了", textColor: "#f3d78b" }));
       root.append(new g.Label({ scene, x: W / 2, y: 230, anchorX: 0.5, font: font42, text: "SCORE  " + score, textColor: "#ffffff" }));
-      root.append(new g.Label({ scene, x: W / 2, y: 310, anchorX: 0.5, font: font20, text: difficulty.name + "　勇者 " + (bossDefeated ? "撃破" : "生存") + "　魔王死亡 " + deaths + "回　最大軍勢 " + FINAL_COST_LIMIT, textColor: "#c9d9d1" }));
+      root.append(new g.Label({ scene, x: W / 2, y: 310, anchorX: 0.5, font: font28, text: difficulty.name + "　勇者 " + (bossDefeated ? "撃破" : "生存") + "　魔王死亡 " + deaths + "回　最大軍勢 " + FINAL_COST_LIMIT, textColor: "#c9d9d1" }));
       if (deaths === 0) root.append(new g.Label({ scene, x: W / 2, y: 355, anchorX: 0.5, font: font28, text: "ノーデスボーナス +" + noDeathBonus, textColor: "#8ee6c3" }));
       if (g.game.requestSaveScore) g.game.requestSaveScore(score);
     }
@@ -1397,25 +1436,23 @@ exports.main = function main(param) {
         "フィールドをドラッグして魔王を動かし、触媒を拾う",
         "画面下の触媒を1～3個選ぶ（選択中は戦闘停止）",
         "光ったフィールドをタップしてモンスターを召喚",
-        "モンスターは自動戦闘。魔王は3秒で復活／右上で勢力表示切替"
+        "モンスターは自動戦闘、魔王は戦えないのでにげよう"
       ];
       const entities = [overlay, panel, readyTitle];
       entities.forEach((entity) => root.append(entity));
-      const goalLabel = new g.Label({ scene, x: W / 2, y: 137, anchorX: 0.5, font: font20, text: "目的：180秒生き延び、敵を倒してハイスコアを目指せ！", textColor: "#ffe08a" });
-      const operationTitle = new g.Label({ scene, x: 210, y: 180, font: font20, text: "遊び方", textColor: "#8ee6c3" });
-      const lineLabels = lines.map((line, i) => new g.Label({ scene, x: 225, y: 216 + i * 30, font: font16, text: (i + 1) + ". " + line, textColor: "#e7efec" }));
-      const scoreRuleLabel = new g.Label({ scene, x: W / 2, y: 339, anchorX: 0.5, font: font16, text: "敵撃破で得点／魔王死亡で減点　ハードは獲得スコア5倍", textColor: "#f0c6aa" });
-      const difficultyTitle = new g.Label({ scene, x: 210, y: 372, font: font20, text: "難易度を選択（デフォルト：ノーマル）", textColor: "#8ee6c3" });
-      const normalButton = new g.FilledRect({ scene, x: 225, y: 407, width: 390, height: 70, cssColor: "#315b4b", touchable: true });
-      const hardButton = new g.FilledRect({ scene, x: 665, y: 407, width: 390, height: 70, cssColor: "#242d2a", touchable: true });
-      const normalLabel = new g.Label({ scene, x: 420, y: 414, anchorX: 0.5, font: font20, text: "● ノーマル（選択中）", textColor: "#ffffff" });
-      const normalDetail = new g.Label({ scene, x: 420, y: 449, anchorX: 0.5, font: font12, text: "標準難易度・HP自然回復あり", textColor: "#d5e5df" });
-      const hardLabel = new g.Label({ scene, x: 860, y: 414, anchorX: 0.5, font: font20, text: "ハード", textColor: "#d4ddd9" });
-      const hardDetail = new g.Label({ scene, x: 860, y: 449, anchorX: 0.5, font: font12, text: "敵AI・敵数・対群強化／地形共鳴・スコア5倍", textColor: "#f2b4a8" });
-      const startButton = new g.FilledRect({ scene, x: 440, y: 498, width: 400, height: 68, cssColor: "#a45b35", touchable: true });
-      const startLabel = new g.Label({ scene, x: W / 2, y: 510, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
-      const countdownLabel = new g.Label({ scene, x: W / 2, y: 588, anchorX: 0.5, font: font20, text: "自動開始まで 10", textColor: "#f3d78b" });
-      entities.push(goalLabel, operationTitle, ...lineLabels, scoreRuleLabel, difficultyTitle, normalButton, hardButton, normalLabel, normalDetail, hardLabel, hardDetail, startButton, startLabel, countdownLabel);
+      const goalLabel = new g.Label({ scene, x: W / 2, y: 137, anchorX: 0.5, font: font28, text: "目的：140秒生き延び、敵を倒してハイスコアを目指せ！", textColor: "#ffe08a" });
+      const operationTitle = new g.Label({ scene, x: 210, y: 184, font: font28, text: "遊び方", textColor: "#8ee6c3" });
+      const lineLabels = lines.map((line, i) => new g.Label({ scene, x: 225, y: 226 + i * 39, font: font20, text: (i + 1) + ". " + line, textColor: "#ffffff" }));
+      const scoreRuleLabel = new g.Label({ scene, x: W / 2, y: 388, anchorX: 0.5, font: font20, text: "敵撃破で得点／魔王死亡で減点　ハードは獲得スコア5倍", textColor: "#f0c6aa" });
+      const difficultyTitle = new g.Label({ scene, x: 210, y: 426, font: font20, text: "難易度を選択（デフォルト：ノーマル）", textColor: "#8ee6c3" });
+      const normalButton = new g.FilledRect({ scene, x: 225, y: 462, width: 390, height: 62, cssColor: "#315b4b", touchable: true });
+      const hardButton = new g.FilledRect({ scene, x: 665, y: 462, width: 390, height: 62, cssColor: "#242d2a", touchable: true });
+      const normalLabel = new g.Label({ scene, x: 420, y: 473, anchorX: 0.5, font: font28, text: "● ノーマル（選択中）", textColor: "#ffffff" });
+      const hardLabel = new g.Label({ scene, x: 860, y: 473, anchorX: 0.5, font: font28, text: "ハード", textColor: "#d4ddd9" });
+      const startButton = new g.FilledRect({ scene, x: 440, y: 543, width: 400, height: 62, cssColor: "#a45b35", touchable: true });
+      const startLabel = new g.Label({ scene, x: W / 2, y: 554, anchorX: 0.5, font: font28, text: "ノーマルで開始", textColor: "#ffffff" });
+      const countdownLabel = new g.Label({ scene, x: W / 2, y: 617, anchorX: 0.5, font: font28, text: "自動開始まで 10", textColor: "#f3d78b" });
+      entities.push(goalLabel, operationTitle, ...lineLabels, scoreRuleLabel, difficultyTitle, normalButton, hardButton, normalLabel, hardLabel, startButton, startLabel, countdownLabel);
       entities.slice(3).forEach((entity) => root.append(entity));
 
       function refreshDifficultySelection() {
@@ -1440,12 +1477,14 @@ exports.main = function main(param) {
         entities.forEach((entity) => entity.destroy());
         phase = "play";
         if (difficultyId === "hard") spawnLeft *= difficulty.spawnIntervalMultiplier;
-        phaseLabel.text = difficulty.name + "　防衛開始";
-        phaseLabel.invalidate();
         const startMessage = difficultyId === "hard"
           ? "ハード開始！ 2～3触媒を適性地形へ置いて地形共鳴せよ"
           : "ノーマルで防衛開始！ 触媒を集めて召喚せよ";
-        showToast(startMessage, difficultyId === "hard" ? "#ffb0a4" : "#8ee6c3");
+        showToast(
+          startMessage,
+          difficultyId === "hard" ? "#ffb0a4" : "#8ee6c3",
+          difficultyId === "hard" ? 3.5 : 1.6
+        );
       }
       startButton.onPointDown.add(beginGame);
       refreshDifficultySelection();
@@ -1472,7 +1511,7 @@ exports.main = function main(param) {
       if (ended) { updateEffects(DT); return; }
 
       elapsed += DT;
-      const showRuleHint = elapsed < 18;
+      const showRuleHint = elapsed < 18 && selected.length === 0;
       setEntityVisible(ruleHintBg, showRuleHint);
       setEntityVisible(ruleHintLabel, showRuleHint);
       pumpAudioLoading();
@@ -1514,13 +1553,15 @@ exports.main = function main(param) {
         fastUiLeft = 0.1;
         const pauseDisplay = Math.max(0, Math.ceil(summonPauseLeft * 5) / 5).toFixed(1);
         setLabelText(pauseIndicator, battlePaused ? "戦術停止 " + pauseDisplay + "　召喚地点をタップ" : "");
-        setLabelText(phaseLabel, difficulty.name + "　" + (battlePaused ? "戦術停止" : phaseName() + "　魔軍×" + Logic.monsterTierBoost(monsterTier).toFixed(2)));
         refreshSummonGuidance();
-        setLabelText(statusLabel, "軍勢 " + currentCost() + "/" + costLimit + "  死亡 " + deaths);
+        setLabelText(statusLabel, "死亡 " + deaths);
         setLabelText(comboLabel, combo >= 2 ? combo + " COMBO  ×" + (1 + Math.min(10, combo - 1) * 0.1).toFixed(1) : "");
       }
       toastLeft -= DT;
-      if (toastLeft <= 0 && toastLabel.visible()) toastLabel.hide();
+      if (toastLeft <= 0 && toastLabel.visible()) {
+        toastLabel.hide();
+        toastBg.hide();
+      }
 
       if (!battlePaused) {
         spawnLeft -= DT;
@@ -1530,7 +1571,7 @@ exports.main = function main(param) {
           if (random.generate() < spawnParameters.extraChance) spawnEnemy(chooseEnemyType());
           spawnLeft = spawnParameters.interval;
         }
-        if (!bossSpawned && elapsed >= 160) { bossSpawned = true; spawnEnemy("hero"); }
+        if (!bossSpawned && elapsed >= HERO_APPEAR_TIME) { bossSpawned = true; spawnEnemy("hero"); }
 
         dropLeft -= DT;
         if (dropLeft <= 0) {
